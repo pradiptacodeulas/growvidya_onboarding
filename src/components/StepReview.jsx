@@ -30,6 +30,8 @@ export default function StepReview({
   campusContactData,
   academicYearData,
   adminData,
+  isTrialMode,
+  setIsTrialMode,
   onBack,
 }) {
   const [couponCode, setCouponCode] = useState('');
@@ -40,10 +42,13 @@ export default function StepReview({
   const [statusMessage, setStatusMessage] = useState('');
   const [errorMessage, setErrorMessage] = useState('');
 
-  const isTrial = selectedPlan.billing_cycle === 'trial' || parseFloat(selectedPlan.price) === 0;
-  const basePrice = parseFloat(selectedPlan.price || 0);
+  const trialDays = selectedPlan?.free_trial_days !== undefined && selectedPlan?.free_trial_days !== null
+    ? parseInt(selectedPlan.free_trial_days, 10)
+    : 0;
+  const isTrial = Boolean(isTrialMode) || selectedPlan?.billing_cycle === 'trial' || parseFloat(selectedPlan?.price) === 0;
+  const basePrice = parseFloat(selectedPlan?.price || 0);
   const discountAmount = appliedCoupon ? parseFloat(appliedCoupon.discountAmount || 0) : 0;
-  const finalAmount = Math.max(0, basePrice - discountAmount);
+  const finalAmount = isTrial ? 0 : Math.max(0, basePrice - discountAmount);
 
   const portalUrl = process.env.NEXT_PUBLIC_PORTAL_URL || 'http://localhost:5174';
 
@@ -69,6 +74,31 @@ export default function StepReview({
     try {
       setSubmitting(true);
       setErrorMessage('');
+
+      if (isTrial) {
+        setStatusMessage('Verifying free trial eligibility with backend server...');
+        try {
+          const eligRes = await saasApi.checkTrialEligibility({
+            plan_id: selectedPlan.id,
+            email: adminData.email,
+            school_code: schoolProfileData.school_code,
+            phone: campusContactData.phone_number || adminData.phone,
+          });
+          if (eligRes?.data && eligRes.data.is_eligible === false) {
+            setErrorMessage(eligRes.data.reason || 'You are not eligible for a free trial on this plan.');
+            setSubmitting(false);
+            setStatusMessage('');
+            return;
+          }
+        } catch (eligErr) {
+          const errMsg = eligErr.response?.data?.message || eligErr.message;
+          setErrorMessage(errMsg || 'Failed to verify free trial eligibility.');
+          setSubmitting(false);
+          setStatusMessage('');
+          return;
+        }
+      }
+
       setStatusMessage('Provisioning institutional environment, campus schema, and database...');
       const payload = {
         plan_id: selectedPlan.id,
@@ -398,7 +428,9 @@ export default function StepReview({
                 </span>
                 <h5 className="fw-bold text-dark mb-0">{selectedPlan.plan_name}</h5>
                 <span className="text-muted fs-13">
-                  {isTrial ? '14-Day Free Evaluation Access (No Credit Card Required)' : `Billed ${selectedPlan.billing_cycle || 'monthly'}`}
+                  {isTrial
+                    ? (trialDays > 0 ? `${trialDays}-Day Free Evaluation Access (No Credit Card Required)` : 'Free Evaluation Access (No Credit Card Required)')
+                    : `Billed ${selectedPlan.billing_cycle || 'monthly'}`}
                 </span>
               </div>
               <div className="text-end">
@@ -487,7 +519,7 @@ export default function StepReview({
             </>
           ) : isTrial ? (
             <>
-              <span>🚀 Activate 14-Day Free Trial</span>
+              <span>🚀 Activate {trialDays > 0 ? `${trialDays}-Day ` : ''}Free Trial</span>
             </>
           ) : (
             <>

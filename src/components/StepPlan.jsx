@@ -9,6 +9,8 @@ export default function StepPlan({
   setSelectedPlan,
   billingCycle,
   setBillingCycle,
+  isTrialMode,
+  setIsTrialMode,
   onNext,
 }) {
   if (!selectedPlan) {
@@ -39,7 +41,10 @@ export default function StepPlan({
     );
   }
 
-  const isTrial = selectedPlan.billing_cycle === 'trial' || parseFloat(selectedPlan.price) === 0;
+  const trialDays = selectedPlan.free_trial_days !== undefined && selectedPlan.free_trial_days !== null
+    ? parseInt(selectedPlan.free_trial_days, 10)
+    : 0;
+  const isTrial = Boolean(isTrialMode) || selectedPlan.billing_cycle === 'trial' || parseFloat(selectedPlan.price) === 0;
 
   // Extract SMS & Push quotas if configured
   const smsItem = (selectedPlan.items || []).find(
@@ -73,7 +78,9 @@ export default function StepPlan({
               {isTrial ? '₹0' : `₹${Number(selectedPlan.price).toLocaleString('en-IN')}`}
             </span>
             <span className="text-muted fs-14 fw-semibold">
-              {isTrial ? ' / 14-day free trial' : ` / ${selectedPlan.billing_cycle || billingCycle}`}
+              {isTrial
+                ? (trialDays > 0 ? ` / ${trialDays}-day free trial` : ' / Free Trial')
+                : ` / ${selectedPlan.billing_cycle || billingCycle}`}
             </span>
           </div>
           <span className="badge bg-success-subtle text-success border border-success-subtle rounded-pill px-2.5 py-1 fs-11 fw-semibold mt-1">

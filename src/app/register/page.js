@@ -27,11 +27,14 @@ function RegisterContent() {
   const planIdParam = searchParams.get('plan_id') || searchParams.get('planId') || searchParams.get('plan');
   const cycleParam = searchParams.get('cycle') || searchParams.get('billing_cycle') || '';
 
+  const trialParam = searchParams.get('trial') === '1' || searchParams.get('trial') === 'true';
+
   const [currentStep, setCurrentStep] = useState(0);
   const [loading, setLoading] = useState(true);
   const [plans, setPlans] = useState([]);
   const [selectedPlan, setSelectedPlan] = useState(null);
   const [billingCycle, setBillingCycle] = useState(cycleParam);
+  const [isTrialMode, setIsTrialMode] = useState(trialParam);
 
   // Section 2: School Profile Data
   const [schoolProfileData, setSchoolProfileData] = useState({
@@ -133,6 +136,8 @@ function RegisterContent() {
           setSelectedPlan={setSelectedPlan}
           billingCycle={billingCycle}
           setBillingCycle={setBillingCycle}
+          isTrialMode={isTrialMode}
+          setIsTrialMode={setIsTrialMode}
           onNext={() => setCurrentStep(1)}
         />
       )}
@@ -186,6 +191,8 @@ function RegisterContent() {
           campusContactData={campusContactData}
           academicYearData={academicYearData}
           adminData={adminData}
+          isTrialMode={isTrialMode}
+          setIsTrialMode={setIsTrialMode}
           onBack={() => setCurrentStep(4)}
         />
       )}

@@ -21,6 +21,11 @@ export const saasApi = {
     return res.data;
   },
 
+  checkTrialEligibility: async (params) => {
+    const res = await apiClient.get('/saas/trial-eligibility', { params });
+    return res.data;
+  },
+
   getCountries: async () => {
     const res = await apiClient.get('/saas/locations/countries');
     return res.data;
