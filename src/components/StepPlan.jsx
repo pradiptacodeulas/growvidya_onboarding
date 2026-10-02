@@ -100,15 +100,15 @@ export default function StepPlan({
           </div>
         )}
 
-        {selectedPlan.max_teachers !== undefined && selectedPlan.max_teachers !== null && (
+        {selectedPlan.free_trial_days !== undefined && selectedPlan.free_trial_days > 0 && (
           <div className="col-sm-6 col-lg-3">
             <div className="p-3 bg-light rounded-3 border h-100">
               <div className="d-flex align-items-center gap-2 mb-1">
-                <UserCheck size={18} className="text-success" />
-                <span className="fs-12 text-muted fw-semibold">Staff & Teachers</span>
+                <ShieldCheck size={18} className="text-success" />
+                <span className="fs-12 text-muted fw-semibold">Free Trial</span>
               </div>
               <div className="fs-16 fw-bold text-dark">
-                {selectedPlan.max_teachers > 0 ? `Up to ${Number(selectedPlan.max_teachers).toLocaleString()}` : 'Unlimited'}
+                {selectedPlan.free_trial_days} Days
               </div>
             </div>
           </div>
