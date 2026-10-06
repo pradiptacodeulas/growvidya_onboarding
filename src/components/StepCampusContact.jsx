@@ -69,9 +69,7 @@ export default function StepCampusContact({
       city_name: '',
     }));
 
-    if (errors.country) {
-      setErrors((prev) => ({ ...prev, country: null }));
-    }
+    setErrors((prev) => ({ ...prev, country: null, state: null, city: null }));
 
     if (selectedCountryId) {
       try {
@@ -100,9 +98,7 @@ export default function StepCampusContact({
       city_name: '',
     }));
 
-    if (errors.state) {
-      setErrors((prev) => ({ ...prev, state: null }));
-    }
+    setErrors((prev) => ({ ...prev, state: null, city: null }));
 
     if (selectedStateId) {
       try {
@@ -143,8 +139,42 @@ export default function StepCampusContact({
   const handleValidateAndNext = async () => {
     const newErrors = {};
 
-    if (formData.email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.email.trim())) {
+    // 1. Official Helpline Phone (Required)
+    if (!formData.phone_number || !formData.phone_number.trim()) {
+      newErrors.phone_number = 'Official helpline phone is required.';
+    } else {
+      const cleanDigits = formData.phone_number.replace(/[^0-9]/g, '');
+      if (cleanDigits.length < 7 || cleanDigits.length > 15) {
+        newErrors.phone_number = 'Please enter a valid phone number (7-15 digits).';
+      }
+    }
+
+    // 2. Official School Email (Required)
+    if (!formData.email || !formData.email.trim()) {
+      newErrors.email = 'Official school email is required.';
+    } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.email.trim())) {
       newErrors.email = 'Please enter a valid institution email format.';
+    }
+
+    // 3. Address Section (Required: Physical Address, Country, State, City, Pincode)
+    if (!formData.address || !formData.address.trim()) {
+      newErrors.address = 'Campus physical address is required.';
+    }
+
+    if (!formData.country) {
+      newErrors.country = 'Please select a country.';
+    }
+
+    if (!formData.state) {
+      newErrors.state = 'Please select a state / province.';
+    }
+
+    if (!formData.city) {
+      newErrors.city = 'Please select a city.';
+    }
+
+    if (!formData.postal_code || !formData.postal_code.trim()) {
+      newErrors.postal_code = 'Pincode / postal code is required.';
     }
 
     if (Object.keys(newErrors).length > 0) {
@@ -152,43 +182,38 @@ export default function StepCampusContact({
       return;
     }
 
-    // Check availability if school email or phone number is provided
-    const hasEmail = Boolean(formData.email && formData.email.trim());
-    const hasPhone = Boolean(formData.phone_number && formData.phone_number.trim());
+    // Check availability for official school email and helpline phone
+    try {
+      setCheckingAvailability(true);
+      const res = await saasApi.checkAvailability({
+        school_email: formData.email.trim(),
+        school_phone: formData.phone_number.trim(),
+      });
 
-    if (hasEmail || hasPhone) {
-      try {
-        setCheckingAvailability(true);
-        const res = await saasApi.checkAvailability({
-          school_email: hasEmail ? formData.email.trim() : null,
-          school_phone: hasPhone ? formData.phone_number.trim() : null,
-        });
-
-        if (res?.data && !res.data.available) {
-          const field = res.data.field;
-          if (field === 'school_email') {
-            setErrors((prev) => ({ ...prev, email: res.data.message }));
-          } else if (field === 'school_phone') {
-            setErrors((prev) => ({ ...prev, phone_number: res.data.message }));
-          } else {
-            setErrors((prev) => ({ ...prev, general: res.data.message }));
-          }
+      if (res?.data && !res.data.available) {
+        const field = res.data.field;
+        if (field === 'school_email') {
+          setErrors((prev) => ({ ...prev, email: res.data.message }));
+        } else if (field === 'school_phone') {
+          setErrors((prev) => ({ ...prev, phone_number: res.data.message }));
+        } else {
+          setErrors((prev) => ({ ...prev, general: res.data.message }));
+        }
+        return;
+      }
+    } catch (err) {
+      const errorMsg = err.response?.data?.message;
+      if (errorMsg) {
+        if (errorMsg.toLowerCase().includes('email')) {
+          setErrors((prev) => ({ ...prev, email: errorMsg }));
+          return;
+        } else if (errorMsg.toLowerCase().includes('phone')) {
+          setErrors((prev) => ({ ...prev, phone_number: errorMsg }));
           return;
         }
-      } catch (err) {
-        const errorMsg = err.response?.data?.message;
-        if (errorMsg) {
-          if (errorMsg.toLowerCase().includes('email')) {
-            setErrors((prev) => ({ ...prev, email: errorMsg }));
-            return;
-          } else if (errorMsg.toLowerCase().includes('phone')) {
-            setErrors((prev) => ({ ...prev, phone_number: errorMsg }));
-            return;
-          }
-        }
-      } finally {
-        setCheckingAvailability(false);
       }
+    } finally {
+      setCheckingAvailability(false);
     }
 
     onNext();
@@ -210,10 +235,18 @@ export default function StepCampusContact({
         </div>
       </div>
 
+      {errors.general && (
+        <div className="alert alert-danger d-flex align-items-center gap-2 py-2 px-3 fs-13 mb-3">
+          <span>{errors.general}</span>
+        </div>
+      )}
+
       <div className="row g-3">
         {/* Official Helpline Phone */}
         <div className="col-12 col-md-6">
-          <label className="form-label">Official Helpline Phone</label>
+          <label className="form-label">
+            Official Helpline Phone <span className="text-danger">*</span>
+          </label>
           <div className="input-group">
             <span className="input-group-text bg-light text-muted">
               <Phone size={16} />
@@ -233,7 +266,9 @@ export default function StepCampusContact({
 
         {/* Official School Email */}
         <div className="col-12 col-md-6">
-          <label className="form-label">Official School Email</label>
+          <label className="form-label">
+            Official School Email <span className="text-danger">*</span>
+          </label>
           <div className="input-group">
             <span className="input-group-text bg-light text-muted">
               <Mail size={16} />
@@ -270,27 +305,32 @@ export default function StepCampusContact({
 
         {/* Campus Physical Address */}
         <div className="col-12">
-          <label className="form-label">Campus Physical Address</label>
+          <label className="form-label">
+            Campus Physical Address <span className="text-danger">*</span>
+          </label>
           <div className="input-group">
             <span className="input-group-text bg-light text-muted">
               <MapPin size={16} />
             </span>
             <input
               type="text"
-              className="form-control"
+              className={`form-control ${errors.address ? 'is-invalid' : ''}`}
               name="address"
               value={formData.address || ''}
               onChange={handleChange}
               placeholder="Building name, Street address, Landmark, Campus area"
             />
           </div>
+          {errors.address && <div className="text-danger fs-12 mt-1">{errors.address}</div>}
         </div>
 
         {/* Country */}
         <div className="col-12 col-md-4">
-          <label className="form-label">Country</label>
+          <label className="form-label">
+            Country <span className="text-danger">*</span>
+          </label>
           <select
-            className="form-select"
+            className={`form-select ${errors.country ? 'is-invalid' : ''}`}
             name="country"
             value={formData.country || ''}
             onChange={handleCountryChange}
@@ -305,13 +345,16 @@ export default function StepCampusContact({
               </option>
             ))}
           </select>
+          {errors.country && <div className="text-danger fs-12 mt-1">{errors.country}</div>}
         </div>
 
         {/* State (Loaded dynamically with respect to selected country) */}
         <div className="col-12 col-md-4">
-          <label className="form-label">State / Province</label>
+          <label className="form-label">
+            State / Province <span className="text-danger">*</span>
+          </label>
           <select
-            className="form-select"
+            className={`form-select ${errors.state ? 'is-invalid' : ''}`}
             name="state"
             value={formData.state || ''}
             onChange={handleStateChange}
@@ -332,13 +375,16 @@ export default function StepCampusContact({
               </option>
             ))}
           </select>
+          {errors.state && <div className="text-danger fs-12 mt-1">{errors.state}</div>}
         </div>
 
         {/* City (Loaded dynamically with respect to selected state - strictly dropdown, no fallback) */}
         <div className="col-12 col-md-4">
-          <label className="form-label">City</label>
+          <label className="form-label">
+            City <span className="text-danger">*</span>
+          </label>
           <select
-            className="form-select"
+            className={`form-select ${errors.city ? 'is-invalid' : ''}`}
             name="city"
             value={formData.city || ''}
             onChange={handleCityChange}
@@ -359,24 +405,28 @@ export default function StepCampusContact({
               </option>
             ))}
           </select>
+          {errors.city && <div className="text-danger fs-12 mt-1">{errors.city}</div>}
         </div>
 
         {/* Pincode */}
         <div className="col-12 col-md-6">
-          <label className="form-label">Pincode / Postal Code</label>
+          <label className="form-label">
+            Pincode / Postal Code <span className="text-danger">*</span>
+          </label>
           <div className="input-group">
             <span className="input-group-text bg-light text-muted">
               <Hash size={16} />
             </span>
             <input
               type="text"
-              className="form-control"
+              className={`form-control ${errors.postal_code ? 'is-invalid' : ''}`}
               name="postal_code"
               value={formData.postal_code || ''}
               onChange={handleChange}
               placeholder="e.g. 110001"
             />
           </div>
+          {errors.postal_code && <div className="text-danger fs-12 mt-1">{errors.postal_code}</div>}
         </div>
 
         {/* Footer / Copyright Note */}

@@ -2,9 +2,7 @@
 
 import React, { useState } from 'react';
 import {
-  ArrowLeft,
   Check,
-  ShieldCheck,
   Tag,
   Loader2,
   Sparkles,
@@ -13,12 +11,16 @@ import {
   Building2,
   Calendar,
   UserCheck,
-  CreditCard,
 } from 'lucide-react';
 import saasApi from '../lib/api';
 
 export default function StepReview({
   selectedPlan,
+  catalog = {},
+  selectedStorageId = null,
+  selectedMachines = {},
+  selectedCards = {},
+  selectedNotifications = {},
   schoolProfileData,
   campusContactData,
   academicYearData,
@@ -46,18 +48,54 @@ export default function StepReview({
   const hasTrialOption = trialDays > 0 && !isPureFreeOrTrial;
   const basePrice = parseFloat(selectedPlan?.price || 0);
   const cycle = selectedPlan?.billing_cycle || 'annual';
+
+  // Add-ons data & calculations
+  const storagePlans = catalog?.storage_plans || [];
+  const attendanceMachines = catalog?.attendance_machines || [];
+  const rfidCards = catalog?.rfid_cards || [];
+  const notificationRecords = catalog?.notification_records || [];
+
+  const selectedStorage = storagePlans.find((s) => s.id === Number(selectedStorageId)) || null;
+  const storagePrice = selectedStorage
+    ? (cycle === 'monthly' ? parseFloat(selectedStorage.monthly_price || 0) : parseFloat(selectedStorage.annual_price || 0))
+    : 0;
+
+  const machinesList = Object.entries(selectedMachines || {}).map(([id, qty]) => {
+    const m = attendanceMachines.find((item) => Number(item.id) === Number(id));
+    if (!m || qty <= 0) return null;
+    const unitPrice = parseFloat(m.unit_price || 0);
+    return { ...m, quantity: qty, unitPrice, total: unitPrice * qty };
+  }).filter(Boolean);
+
+  const machinesTotal = machinesList.reduce((sum, item) => sum + item.total, 0);
+
+  const cardsList = Object.entries(selectedCards || {}).map(([id, qty]) => {
+    const c = rfidCards.find((item) => Number(item.id) === Number(id));
+    if (!c || qty <= 0) return null;
+    const unitPrice = parseFloat(c.unit_price || 0);
+    return { ...c, quantity: qty, unitPrice, total: unitPrice * qty };
+  }).filter(Boolean);
+
+  const cardsTotal = cardsList.reduce((sum, item) => sum + item.total, 0);
+
+  const notificationsList = Object.entries(selectedNotifications || {}).map(([id, cfg]) => {
+    if (!cfg?.selected || !cfg?.quantity) return null;
+    const n = notificationRecords.find((item) => Number(item.id) === Number(id));
+    if (!n) return null;
+    const unitPrice = parseFloat(n.cost || 0);
+    const total = Math.round(unitPrice * cfg.quantity * 100) / 100;
+    return { ...n, quantity: cfg.quantity, unitPrice, total };
+  }).filter(Boolean);
+
+  const notificationsTotal = notificationsList.reduce((sum, item) => sum + item.total, 0);
+
+  const addonsTotal = storagePrice + machinesTotal + cardsTotal + notificationsTotal;
+  const subtotal = basePrice + addonsTotal;
   const discountAmount = appliedCoupon ? parseFloat(appliedCoupon.discountAmount || 0) : 0;
-  const finalAmount = Math.max(0, basePrice - discountAmount);
+  const finalAmount = Math.max(0, subtotal - discountAmount);
+  const trialPayable = addonsTotal;
 
-  // Validity description calculation for upfront paid bonus
-  const extendedValidityLabel =
-    cycle === 'annual'
-      ? `13 Months Total Access (12 Months Annual + ${trialDays > 0 ? `${trialDays} Days` : '1 Month'} Free Bonus)`
-      : cycle === 'monthly'
-      ? `2 Months Total Access (1 Month Paid + ${trialDays > 0 ? `${trialDays} Days` : '1 Month'} Free Bonus)`
-      : `Full ${cycle} + ${trialDays} Days Free Bonus`;
-
-  // GST Breakdown (18% inclusive inside the plan: 9% CGST + 9% SGST)
+  // GST Breakdown (18% inclusive inside the plan & addons: 9% CGST + 9% SGST)
   const taxableBase = finalAmount > 0 ? Math.round((finalAmount / 1.18) * 100) / 100 : 0;
   const totalGst = finalAmount > 0 ? Math.round((finalAmount - taxableBase) * 100) / 100 : 0;
   const cgst = Math.round((totalGst / 2) * 100) / 100;
@@ -70,7 +108,7 @@ export default function StepReview({
     try {
       setValidatingCoupon(true);
       setCouponError('');
-      const res = await saasApi.validateCoupon(couponCode.trim(), basePrice);
+      const res = await saasApi.validateCoupon(couponCode.trim(), subtotal);
       if (res?.data) {
         if (setAppliedCoupon) setAppliedCoupon(res.data);
       } else {
@@ -146,7 +184,13 @@ export default function StepReview({
       const payload = {
         plan_id: selectedPlan.id,
         is_trial: isTrialAction,
-        amount_paid: isTrialAction ? 0 : finalAmount,
+        amount_paid: isTrialAction ? (addonsTotal > 0 ? addonsTotal : 0) : finalAmount,
+        storage_plan_id: selectedStorageId || null,
+        storage_qty: 1,
+        selected_machines: machinesList.map((m) => ({ id: m.id, quantity: m.quantity })),
+        selected_cards: cardsList.map((c) => ({ id: c.id, quantity: c.quantity })),
+        selected_notifications: notificationsList.map((n) => ({ id: n.id, quantity: n.quantity, type: n.type })),
+        shipping_address: campusContactData.address,
         coupon_code: !isTrialAction && appliedCoupon ? appliedCoupon.code : null,
         school: {
           school_name: schoolProfileData.school_name,
@@ -180,8 +224,8 @@ export default function StepReview({
           picture: adminData.picture || null,
           password: adminData.password,
         },
-        payment_gateway: isTrialAction ? 'trial' : 'razorpay',
-        payment_transaction_id: paymentProof.paymentId || (isTrialAction ? `TRIAL_${trialDays || 14}D_${Date.now()}` : null),
+        payment_gateway: isTrialAction ? (addonsTotal > 0 ? 'razorpay' : 'free_trial') : 'razorpay',
+        payment_transaction_id: paymentProof.paymentId || (isTrialAction && addonsTotal === 0 ? `TRIAL_${trialDays || 14}D_${Date.now()}` : null),
         razorpay_order_id: paymentProof.orderId || null,
         razorpay_payment_id: paymentProof.paymentId || null,
         razorpay_signature: paymentProof.signature || null,
@@ -214,7 +258,80 @@ export default function StepReview({
 
   const handleActivateTrial = async () => {
     if (setIsTrialMode) setIsTrialMode(true);
-    await handleCompleteRegistration({}, true);
+
+    if (addonsTotal > 0) {
+      // Need to checkout and pay for configured add-ons via Razorpay
+      try {
+        setSubmitting(true);
+        setErrorMessage('');
+        setStatusMessage('Initializing payment gateway for selected add-ons & hardware...');
+
+        const orderRes = await saasApi.createOrder({
+          plan_id: selectedPlan.id,
+          is_trial: true,
+          storage_plan_id: selectedStorageId || null,
+          storage_qty: 1,
+          selected_machines: machinesList.map((m) => ({ id: m.id, quantity: m.quantity })),
+          selected_cards: cardsList.map((c) => ({ id: c.id, quantity: c.quantity })),
+          selected_notifications: notificationsList.map((n) => ({ id: n.id, quantity: n.quantity, type: n.type })),
+          coupon_code: appliedCoupon ? appliedCoupon.code : null,
+          admin_email: adminData.email,
+          admin_phone: adminData.phone,
+          school_email: campusContactData.email,
+          school_phone: campusContactData.phone_number,
+        });
+
+        const orderData = orderRes?.data;
+        if (!orderData?.order_id) {
+          throw new Error('Failed to create payment order for add-ons.');
+        }
+
+        if (typeof window === 'undefined' || !window.Razorpay) {
+          throw new Error('Payment gateway SDK is loading. Please try again in a few moments.');
+        }
+
+        const options = {
+          key: orderData.key_id,
+          amount: orderData.amount,
+          currency: orderData.currency || 'INR',
+          name: 'Growvidya Platform',
+          description: `Add-ons & Free Trial: ${selectedPlan.plan_name}`,
+          order_id: orderData.order_id,
+          prefill: {
+            name: `${adminData.first_name} ${adminData.last_name || ''}`.trim(),
+            email: adminData.email,
+            contact: adminData.phone || '',
+          },
+          theme: { color: '#0d6efd' },
+          handler: async (response) => {
+            await handleCompleteRegistration(
+              {
+                orderId: response.razorpay_order_id,
+                paymentId: response.razorpay_payment_id,
+                signature: response.razorpay_signature,
+              },
+              true
+            );
+          },
+          modal: {
+            ondismiss: () => {
+              setSubmitting(false);
+              setStatusMessage('');
+            },
+          },
+        };
+
+        const rzp = new window.Razorpay(options);
+        rzp.open();
+      } catch (err) {
+        console.error('Payment error for add-ons:', err);
+        setErrorMessage(err.message || 'Payment processing failed. Please try again.');
+        setSubmitting(false);
+        setStatusMessage('');
+      }
+    } else {
+      await handleCompleteRegistration({}, true);
+    }
   };
 
   const handlePayAndActivate = async () => {
@@ -252,6 +369,12 @@ export default function StepReview({
 
       const orderRes = await saasApi.createOrder({
         plan_id: selectedPlan.id,
+        is_trial: false,
+        storage_plan_id: selectedStorageId || null,
+        storage_qty: 1,
+        selected_machines: machinesList.map((m) => ({ id: m.id, quantity: m.quantity })),
+        selected_cards: cardsList.map((c) => ({ id: c.id, quantity: c.quantity })),
+        selected_notifications: notificationsList.map((n) => ({ id: n.id, quantity: n.quantity, type: n.type })),
         coupon_code: appliedCoupon ? appliedCoupon.code : null,
         admin_email: adminData.email,
         admin_phone: adminData.phone,
@@ -492,18 +615,18 @@ export default function StepReview({
           </div>
         </div>
 
-        {/* Section 5: Plan & Pricing Summary with GST Breakdown */}
+        {/* Section 5: Plan & Pricing Summary with Itemized Add-ons & GST Breakdown */}
         <div className="col-12">
           <div className="p-4 bg-white rounded-3 border">
             <div className="d-flex justify-content-between align-items-center mb-3 pb-2 border-bottom">
               <div>
                 <span className="badge bg-primary-subtle text-primary border border-primary-subtle rounded-pill px-2.5 py-1 fs-11 fw-bold text-uppercase mb-1">
-                  Selected Package
+                  Selected Package &amp; Customizations
                 </span>
                 <h5 className="fw-bold text-dark mb-0">{selectedPlan.plan_name}</h5>
                 <span className="text-muted fs-13">
                   {hasTrialOption
-                    ? `Billed ${cycle} • Includes ${trialDays}-Day Free Trial Bonus when paid upfront`
+                    ? `Billed ${cycle} • Includes ${trialDays}-Day Free Trial Bonus`
                     : isPureFreeOrTrial
                     ? `Free Evaluation Access (${trialDays > 0 ? `${trialDays} Days` : 'No Credit Card Required'})`
                     : `Billed ${cycle}`}
@@ -511,9 +634,9 @@ export default function StepReview({
               </div>
               <div className="text-end">
                 <span className="fs-20 fw-bold text-primary">
-                  {basePrice === 0 ? 'Free' : `₹${Number(basePrice).toLocaleString('en-IN')}`}
+                  {subtotal === 0 ? 'Free' : `₹${Number(subtotal).toLocaleString('en-IN')}`}
                 </span>
-                {basePrice > 0 && (
+                {subtotal > 0 && (
                   <div className="text-muted fs-11">
                     (18% GST Included)
                   </div>
@@ -521,21 +644,8 @@ export default function StepReview({
               </div>
             </div>
 
-            {/* Informational callout for plans offering both trial and paid activation */}
-            {hasTrialOption && (
-              <div className="p-3 bg-light rounded-3 border mb-3">
-                <div className="d-flex align-items-center gap-2 fw-bold text-dark fs-13 mb-1">
-                  <Sparkles size={16} className="text-primary flex-shrink-0" />
-                  <span>Flexible Activation Options Available:</span>
-                </div>
-                <div className="text-muted fs-12 mb-0">
-                  You can choose to <strong>Pay the regular plan price</strong> to receive your standard {cycle} term plus an extra <strong>+{trialDays} days free trial bonus</strong> ({extendedValidityLabel}), or <strong>Continue with the {trialDays}-day free trial</strong> at ₹0 today. Choose your preferred action button below.
-                </div>
-              </div>
-            )}
-
-            {/* Coupon Code Input for Paid Plans */}
-            {basePrice > 0 && (
+            {/* Coupon Code Input for Paid Subtotals */}
+            {subtotal > 0 && (
               <div className="p-3 bg-light rounded-3 border mb-3">
                 <div className="row g-2 align-items-center justify-content-between">
                   <div className="col-12 col-md-6">
@@ -604,14 +714,42 @@ export default function StepReview({
             {/* Pricing & GST Tax Breakdown */}
             <div className="pt-2">
               <h6 className="fw-bold text-dark fs-13 text-uppercase mb-2.5">
-                Pricing &amp; Tax Breakdown:
+                Itemized Receipt &amp; Tax Breakdown:
               </h6>
 
               <div className="d-flex flex-column gap-2 fs-14">
                 <div className="d-flex justify-content-between text-muted">
-                  <span>Gross Plan Price:</span>
+                  <span>Base Platform License ({selectedPlan.plan_name}):</span>
                   <span>{basePrice === 0 ? '₹0.00' : `₹${Number(basePrice).toLocaleString('en-IN', { minimumFractionDigits: 2 })}`}</span>
                 </div>
+
+                {selectedStorage && (
+                  <div className="d-flex justify-content-between text-dark">
+                    <span>Cloud Storage Expansion ({selectedStorage.plan_name}):</span>
+                    <span>+₹{Number(storagePrice).toLocaleString('en-IN', { minimumFractionDigits: 2 })}</span>
+                  </div>
+                )}
+
+                {machinesList.map((m) => (
+                  <div key={m.id} className="d-flex justify-content-between text-dark">
+                    <span>Attendance Terminal ({m.machine_name} x {m.quantity}):</span>
+                    <span>+₹{Number(m.total).toLocaleString('en-IN', { minimumFractionDigits: 2 })}</span>
+                  </div>
+                ))}
+
+                {cardsList.map((c) => (
+                  <div key={c.id} className="d-flex justify-content-between text-dark">
+                    <span>Smart RFID Cards ({c.card_name} x {c.quantity}):</span>
+                    <span>+₹{Number(c.total).toLocaleString('en-IN', { minimumFractionDigits: 2 })}</span>
+                  </div>
+                ))}
+
+                {notificationsList.map((n) => (
+                  <div key={n.id} className="d-flex justify-content-between text-dark">
+                    <span>Notification Credits ({n.type?.toUpperCase()} x {n.quantity.toLocaleString()}):</span>
+                    <span>+₹{Number(n.total).toLocaleString('en-IN', { minimumFractionDigits: 2 })}</span>
+                  </div>
+                ))}
 
                 {discountAmount > 0 && (
                   <div className="d-flex justify-content-between text-success">
@@ -620,7 +758,7 @@ export default function StepReview({
                   </div>
                 )}
 
-                {basePrice > 0 && (
+                {finalAmount > 0 && (
                   <>
                     <div className="d-flex justify-content-between text-muted pt-2 border-top">
                       <span>Net Taxable Base Amount:</span>
@@ -638,13 +776,13 @@ export default function StepReview({
                     </div>
 
                     <div className="d-flex justify-content-between text-muted fst-italic fs-12 ps-2">
-                      <span>Total Included GST (18% inside plan):</span>
+                      <span>Total Included GST (18% inside package):</span>
                       <span>₹{totalGst.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
                     </div>
                   </>
                 )}
 
-                {basePrice === 0 && (
+                {finalAmount === 0 && (
                   <div className="d-flex justify-content-between text-muted fst-italic fs-13 pt-1 border-top">
                     <span>Applicable GST / Taxes:</span>
                     <span>₹0.00 (Free Evaluation Access)</span>
@@ -654,9 +792,9 @@ export default function StepReview({
                 <div className="d-flex justify-content-between align-items-baseline pt-2 border-top mt-1">
                   <div>
                     <span className="fw-bold text-dark fs-16 d-block">
-                      {hasTrialOption ? 'Total Amount if Paying Now:' : 'Total Amount Payable:'}
+                      Total Package Payable:
                     </span>
-                    {basePrice > 0 && (
+                    {finalAmount > 0 && (
                       <span className="text-muted fs-11">(All taxes &amp; 18% GST inclusive)</span>
                     )}
                   </div>
@@ -664,12 +802,6 @@ export default function StepReview({
                     ₹{Number(finalAmount).toLocaleString('en-IN')}
                   </span>
                 </div>
-
-                {hasTrialOption && (
-                  <div className="text-success fs-12 fw-semibold pt-1">
-                    ✓ Paying ₹{Number(finalAmount).toLocaleString('en-IN')} includes <strong>{extendedValidityLabel}</strong>. Or click &quot;Continue Free Trial&quot; below to start for ₹0 today.
-                  </div>
-                )}
               </div>
             </div>
           </div>
@@ -677,56 +809,51 @@ export default function StepReview({
       </div>
 
       {/* Action Navigation Buttons */}
-      <div className="d-flex flex-wrap justify-content-between align-items-center gap-3 pt-4 border-top">
+      <div className="d-flex flex-wrap justify-content-between align-items-center gap-3 pt-4 border-top mt-4">
         <button
           type="button"
-          className="btn btn-outline-secondary px-4 py-2.5 fw-semibold d-flex align-items-center gap-2"
+          className="btn btn-outline-secondary px-4 py-2.5 fw-semibold fs-14"
           onClick={onBack}
           disabled={submitting}
         >
-          <ArrowLeft size={16} />
-          <span>Back: Super Admin</span>
+          Back
         </button>
 
-        <div className="d-flex flex-wrap align-items-center gap-2.5 ms-auto">
-          {/* Dual Action Buttons for Plans offering both Free Trial and Paid Upfront with Bonus */}
+        <div className="d-flex flex-wrap align-items-center gap-3 ms-auto">
+          {/* Dual Action Buttons for Plans offering both Free Trial and Paid Upfront */}
           {hasTrialOption ? (
             <>
               <button
                 type="button"
-                className="btn btn-outline-success px-4 py-2.5 fw-semibold d-flex align-items-center gap-2"
+                className="btn btn-outline-success px-4 py-2.5 fw-semibold fs-14"
                 onClick={handleActivateTrial}
                 disabled={submitting}
               >
                 {submitting ? (
-                  <>
+                  <span className="d-inline-flex align-items-center gap-2">
                     <Loader2 size={16} className="animate-spin" />
                     <span>Processing...</span>
-                  </>
+                  </span>
                 ) : (
-                  <>
-                    <ShieldCheck size={16} />
-                    <span>Continue {trialDays}-Day Free Trial (₹0)</span>
-                  </>
+                  addonsTotal > 0
+                    ? `Start ${trialDays}-Day Free Trial (Pay ₹${Number(trialPayable).toLocaleString('en-IN')} for Hardware/Add-ons)`
+                    : `Start ${trialDays}-Day Free Trial (₹0)`
                 )}
               </button>
 
               <button
                 type="button"
-                className="btn btn-primary px-4 py-2.5 fw-semibold d-flex align-items-center gap-2 shadow-sm"
+                className="btn btn-primary px-4 py-2.5 fw-semibold fs-14 shadow-sm"
                 onClick={handlePayAndActivate}
                 disabled={submitting}
               >
                 {submitting ? (
-                  <>
+                  <span className="d-inline-flex align-items-center gap-2">
                     <Loader2 size={16} className="animate-spin" />
                     <span>Processing...</span>
-                  </>
+                  </span>
                 ) : (
-                  <>
-                    <Sparkles size={16} />
-                    <span>Pay ₹{Number(finalAmount).toLocaleString('en-IN')} &amp; Activate (+{trialDays}D Bonus)</span>
-                  </>
+                  `Pay ₹${Number(finalAmount).toLocaleString('en-IN')} & Activate`
                 )}
               </button>
             </>
@@ -734,40 +861,36 @@ export default function StepReview({
             /* Pure Trial or 100% Free Plan */
             <button
               type="button"
-              className="btn btn-success px-5 py-2.5 fw-semibold d-flex align-items-center gap-2 shadow-sm"
+              className="btn btn-primary px-4 py-2.5 fw-semibold fs-14 shadow-sm"
               onClick={handleActivateTrial}
               disabled={submitting}
             >
               {submitting ? (
-                <>
-                  <Loader2 size={18} className="animate-spin" />
+                <span className="d-inline-flex align-items-center gap-2">
+                  <Loader2 size={16} className="animate-spin" />
                   <span>Activating...</span>
-                </>
+                </span>
               ) : (
-                <>
-                  <ShieldCheck size={18} />
-                  <span>🚀 Activate {trialDays > 0 ? `${trialDays}-Day ` : ''}Free Trial</span>
-                </>
+                addonsTotal > 0
+                  ? `Activate Free Plan & Pay ₹${Number(trialPayable).toLocaleString('en-IN')} Add-ons`
+                  : trialDays > 0 ? `Activate ${trialDays}-Day Free Trial` : 'Activate Free Plan'
               )}
             </button>
           ) : (
             /* Standard Paid Plan without Free Trial */
             <button
               type="button"
-              className="btn btn-primary px-5 py-2.5 fw-semibold d-flex align-items-center gap-2 shadow-sm"
+              className="btn btn-primary px-4 py-2.5 fw-semibold fs-14 shadow-sm"
               onClick={handlePayAndActivate}
               disabled={submitting}
             >
               {submitting ? (
-                <>
-                  <Loader2 size={18} className="animate-spin" />
+                <span className="d-inline-flex align-items-center gap-2">
+                  <Loader2 size={16} className="animate-spin" />
                   <span>Processing...</span>
-                </>
+                </span>
               ) : (
-                <>
-                  <CreditCard size={18} />
-                  <span>💳 Pay ₹{Number(finalAmount).toLocaleString('en-IN')} &amp; Activate</span>
-                </>
+                `Pay ₹${Number(finalAmount).toLocaleString('en-IN')} & Activate`
               )}
             </button>
           )}

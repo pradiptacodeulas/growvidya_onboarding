@@ -165,36 +165,23 @@ export default function StepSchoolProfile({
           <div className="text-muted fs-11 mt-1">Enter your school&apos;s governing or educational affiliation board.</div>
         </div>
 
-        {/* Medium of Instruction (Fixed Standard Options, No Dummy/Fallback) */}
+        {/* Medium of Instruction */}
         <div className="col-12 col-md-6">
           <label className="form-label">Medium of Instruction</label>
           <div className="input-group">
             <span className="input-group-text bg-light text-muted">
               <Languages size={16} />
             </span>
-            <select
-              className="form-select"
+            <input
+              type="text"
+              className="form-control"
               name="medium_of_instruction"
               value={formData.medium_of_instruction || ''}
               onChange={handleChange}
-            >
-              <option value="">Select Medium of Instruction</option>
-              <option value="English">English</option>
-              <option value="Hindi">Hindi</option>
-              <option value="English & Hindi (Bilingual)">English &amp; Hindi (Bilingual)</option>
-              <option value="Bengali">Bengali</option>
-              <option value="Gujarati">Gujarati</option>
-              <option value="Marathi">Marathi</option>
-              <option value="Tamil">Tamil</option>
-              <option value="Telugu">Telugu</option>
-              <option value="Kannada">Kannada</option>
-              <option value="Malayalam">Malayalam</option>
-              <option value="Urdu">Urdu</option>
-              <option value="Sanskrit">Sanskrit</option>
-              <option value="Regional Language">Regional Language</option>
-              <option value="Other">Other</option>
-            </select>
+              placeholder="e.g. English, Hindi, Bengali, Bilingual"
+            />
           </div>
+          <div className="text-muted fs-11 mt-1">Enter your school&apos;s medium of instruction.</div>
         </div>
 
         {/* Establish Year */}

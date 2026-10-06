@@ -1,7 +1,7 @@
 'use client';
 
 import React from 'react';
-import { Check, ShieldCheck, School, Building2, Calendar, UserCheck, CreditCard } from 'lucide-react';
+import { Check, ShieldCheck, Package, School, Building2, Calendar, UserCheck, CreditCard } from 'lucide-react';
 
 export default function Stepper({ currentStep, steps = [] }) {
   const getStepIcon = (index) => {

@@ -14,7 +14,7 @@ import saasApi from '@/lib/api';
 import { Loader2 } from 'lucide-react';
 
 const STEPS = [
-  { title: 'Selected Plan' },
+  { title: 'Plan & Configure' },
   { title: 'School Profile' },
   { title: 'Campus & Contact' },
   { title: 'Academic Year' },
@@ -36,7 +36,21 @@ function RegisterContent() {
   const [billingCycle, setBillingCycle] = useState(cycleParam);
   const [isTrialMode, setIsTrialMode] = useState(trialParam);
 
-  // Coupon state shared between Step 0 (Plan) and Step 5 (Review)
+  // Configuration Catalog & Add-on state
+  const [catalog, setCatalog] = useState({
+    storage_plans: [],
+    attendance_machines: [],
+    rfid_cards: [],
+    notification_records: [],
+  });
+  const [catalogLoading, setCatalogLoading] = useState(false);
+
+  const [selectedStorageId, setSelectedStorageId] = useState(null);
+  const [selectedMachines, setSelectedMachines] = useState({});
+  const [selectedCards, setSelectedCards] = useState({});
+  const [selectedNotifications, setSelectedNotifications] = useState({});
+
+  // Coupon state shared between Step 0 (Plan) and Review
   const [couponCode, setCouponCode] = useState('');
   const [appliedCoupon, setAppliedCoupon] = useState(null);
 
@@ -94,9 +108,21 @@ function RegisterContent() {
   const fetchPlans = async () => {
     try {
       setLoading(true);
-      const res = await saasApi.getPlans();
-      const allPlans = res?.data || [];
+      setCatalogLoading(true);
+      const [plansRes, catalogRes] = await Promise.all([
+        saasApi.getPlans(),
+        saasApi.getConfigCatalog().catch((err) => {
+          console.error('Failed to load config catalog:', err);
+          return { data: { storage_plans: [], attendance_machines: [], rfid_cards: [], notification_records: [] } };
+        }),
+      ]);
+
+      const allPlans = plansRes?.data || [];
       setPlans(allPlans);
+
+      if (catalogRes?.data) {
+        setCatalog(catalogRes.data);
+      }
 
       // Pre-select plan matching query params
       if (planIdParam) {
@@ -128,6 +154,7 @@ function RegisterContent() {
       console.error('Failed to load plans:', err);
     } finally {
       setLoading(false);
+      setCatalogLoading(false);
     }
   };
 
@@ -145,7 +172,7 @@ function RegisterContent() {
     <div className="container py-4 py-md-5" style={{ maxWidth: '1020px' }}>
       <Stepper currentStep={currentStep} steps={STEPS} />
 
-      {/* Step 0: Plan Selection */}
+      {/* Step 0: Plan & Configuration */}
       {currentStep === 0 && (
         <StepPlan
           plans={plans}
@@ -153,6 +180,17 @@ function RegisterContent() {
           setSelectedPlan={setSelectedPlan}
           billingCycle={billingCycle}
           setBillingCycle={setBillingCycle}
+          isTrialMode={isTrialMode}
+          catalog={catalog}
+          catalogLoading={catalogLoading}
+          selectedStorageId={selectedStorageId}
+          setSelectedStorageId={setSelectedStorageId}
+          selectedMachines={selectedMachines}
+          setSelectedMachines={setSelectedMachines}
+          selectedCards={selectedCards}
+          setSelectedCards={setSelectedCards}
+          selectedNotifications={selectedNotifications}
+          setSelectedNotifications={setSelectedNotifications}
           onNext={() => setCurrentStep(1)}
         />
       )}
@@ -202,6 +240,11 @@ function RegisterContent() {
       {currentStep === 5 && (
         <StepReview
           selectedPlan={selectedPlan}
+          catalog={catalog}
+          selectedStorageId={selectedStorageId}
+          selectedMachines={selectedMachines}
+          selectedCards={selectedCards}
+          selectedNotifications={selectedNotifications}
           schoolProfileData={schoolProfileData}
           campusContactData={campusContactData}
           academicYearData={academicYearData}
