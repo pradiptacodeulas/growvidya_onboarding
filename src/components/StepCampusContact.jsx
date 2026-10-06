@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { ArrowLeft, ArrowRight, Building2, MapPin, Phone, Mail, Globe, Hash } from 'lucide-react';
+import { ArrowLeft, ArrowRight, Building2, MapPin, Phone, Mail, Globe, Hash, Loader2 } from 'lucide-react';
 import saasApi from '../lib/api';
 
 export default function StepCampusContact({
@@ -17,6 +17,7 @@ export default function StepCampusContact({
   const [loadingCountries, setLoadingCountries] = useState(false);
   const [loadingStates, setLoadingStates] = useState(false);
   const [loadingCities, setLoadingCities] = useState(false);
+  const [checkingAvailability, setCheckingAvailability] = useState(false);
   const [errors, setErrors] = useState({});
 
   useEffect(() => {
@@ -139,7 +140,7 @@ export default function StepCampusContact({
     }
   };
 
-  const handleValidateAndNext = () => {
+  const handleValidateAndNext = async () => {
     const newErrors = {};
 
     if (formData.email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.email.trim())) {
@@ -149,6 +150,45 @@ export default function StepCampusContact({
     if (Object.keys(newErrors).length > 0) {
       setErrors(newErrors);
       return;
+    }
+
+    // Check availability if school email or phone number is provided
+    const hasEmail = Boolean(formData.email && formData.email.trim());
+    const hasPhone = Boolean(formData.phone_number && formData.phone_number.trim());
+
+    if (hasEmail || hasPhone) {
+      try {
+        setCheckingAvailability(true);
+        const res = await saasApi.checkAvailability({
+          school_email: hasEmail ? formData.email.trim() : null,
+          school_phone: hasPhone ? formData.phone_number.trim() : null,
+        });
+
+        if (res?.data && !res.data.available) {
+          const field = res.data.field;
+          if (field === 'school_email') {
+            setErrors((prev) => ({ ...prev, email: res.data.message }));
+          } else if (field === 'school_phone') {
+            setErrors((prev) => ({ ...prev, phone_number: res.data.message }));
+          } else {
+            setErrors((prev) => ({ ...prev, general: res.data.message }));
+          }
+          return;
+        }
+      } catch (err) {
+        const errorMsg = err.response?.data?.message;
+        if (errorMsg) {
+          if (errorMsg.toLowerCase().includes('email')) {
+            setErrors((prev) => ({ ...prev, email: errorMsg }));
+            return;
+          } else if (errorMsg.toLowerCase().includes('phone')) {
+            setErrors((prev) => ({ ...prev, phone_number: errorMsg }));
+            return;
+          }
+        }
+      } finally {
+        setCheckingAvailability(false);
+      }
     }
 
     onNext();
@@ -180,13 +220,14 @@ export default function StepCampusContact({
             </span>
             <input
               type="tel"
-              className="form-control"
+              className={`form-control ${errors.phone_number ? 'is-invalid' : ''}`}
               name="phone_number"
               value={formData.phone_number || ''}
               onChange={handleChange}
               placeholder="+91 98765 43210"
             />
           </div>
+          {errors.phone_number && <div className="text-danger fs-12 mt-1">{errors.phone_number}</div>}
           <div className="text-muted fs-11 mt-1">Primary phone shown on invoices and student IDs.</div>
         </div>
 
@@ -370,9 +411,19 @@ export default function StepCampusContact({
           type="button"
           className="btn btn-primary px-4 py-2.5 fw-semibold d-flex align-items-center gap-2"
           onClick={handleValidateAndNext}
+          disabled={checkingAvailability}
         >
-          <span>Continue: Academic Year</span>
-          <ArrowRight size={16} />
+          {checkingAvailability ? (
+            <>
+              <Loader2 size={16} className="animate-spin" />
+              <span>Checking Availability...</span>
+            </>
+          ) : (
+            <>
+              <span>Continue: Academic Year</span>
+              <ArrowRight size={16} />
+            </>
+          )}
         </button>
       </div>
     </div>

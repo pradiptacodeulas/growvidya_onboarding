@@ -36,6 +36,10 @@ function RegisterContent() {
   const [billingCycle, setBillingCycle] = useState(cycleParam);
   const [isTrialMode, setIsTrialMode] = useState(trialParam);
 
+  // Coupon state shared between Step 0 (Plan) and Step 5 (Review)
+  const [couponCode, setCouponCode] = useState('');
+  const [appliedCoupon, setAppliedCoupon] = useState(null);
+
   // Section 2: School Profile Data
   const [schoolProfileData, setSchoolProfileData] = useState({
     school_name: '',
@@ -100,13 +104,26 @@ function RegisterContent() {
         if (found) {
           setSelectedPlan(found);
           setBillingCycle(found.billing_cycle || cycleParam);
+          if (trialParam || found.billing_cycle === 'trial' || parseFloat(found.price) === 0) {
+            setIsTrialMode(true);
+          } else {
+            setIsTrialMode(false);
+          }
           return;
         }
       }
 
       // Default to trial plan if available, or first plan
       const defaultTrial = allPlans.find((p) => p.billing_cycle === 'trial' || parseFloat(p.price) === 0);
-      setSelectedPlan(defaultTrial || allPlans[0] || null);
+      const chosen = defaultTrial || allPlans[0] || null;
+      setSelectedPlan(chosen);
+      if (chosen) {
+        if (trialParam || chosen.billing_cycle === 'trial' || parseFloat(chosen.price) === 0) {
+          setIsTrialMode(true);
+        } else {
+          setIsTrialMode(false);
+        }
+      }
     } catch (err) {
       console.error('Failed to load plans:', err);
     } finally {
@@ -136,8 +153,6 @@ function RegisterContent() {
           setSelectedPlan={setSelectedPlan}
           billingCycle={billingCycle}
           setBillingCycle={setBillingCycle}
-          isTrialMode={isTrialMode}
-          setIsTrialMode={setIsTrialMode}
           onNext={() => setCurrentStep(1)}
         />
       )}
@@ -193,6 +208,10 @@ function RegisterContent() {
           adminData={adminData}
           isTrialMode={isTrialMode}
           setIsTrialMode={setIsTrialMode}
+          couponCode={couponCode}
+          setCouponCode={setCouponCode}
+          appliedCoupon={appliedCoupon}
+          setAppliedCoupon={setAppliedCoupon}
           onBack={() => setCurrentStep(4)}
         />
       )}

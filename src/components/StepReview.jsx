@@ -14,13 +14,6 @@ import {
   Calendar,
   UserCheck,
   CreditCard,
-  Phone,
-  Mail,
-  Globe,
-  MapPin,
-  Award,
-  BookOpen,
-  Languages,
 } from 'lucide-react';
 import saasApi from '../lib/api';
 
@@ -32,23 +25,43 @@ export default function StepReview({
   adminData,
   isTrialMode,
   setIsTrialMode,
+  couponCode = '',
+  setCouponCode,
+  appliedCoupon = null,
+  setAppliedCoupon,
   onBack,
 }) {
-  const [couponCode, setCouponCode] = useState('');
-  const [appliedCoupon, setAppliedCoupon] = useState(null);
   const [couponError, setCouponError] = useState('');
   const [validatingCoupon, setValidatingCoupon] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [statusMessage, setStatusMessage] = useState('');
   const [errorMessage, setErrorMessage] = useState('');
 
-  const trialDays = selectedPlan?.free_trial_days !== undefined && selectedPlan?.free_trial_days !== null
-    ? parseInt(selectedPlan.free_trial_days, 10)
-    : 0;
-  const isTrial = Boolean(isTrialMode) || selectedPlan?.billing_cycle === 'trial' || parseFloat(selectedPlan?.price) === 0;
+  const trialDays =
+    selectedPlan?.free_trial_days !== undefined && selectedPlan?.free_trial_days !== null
+      ? parseInt(selectedPlan.free_trial_days, 10)
+      : 0;
+  const isPureFreeOrTrial =
+    selectedPlan?.billing_cycle === 'trial' || parseFloat(selectedPlan?.price || 0) === 0;
+  const hasTrialOption = trialDays > 0 && !isPureFreeOrTrial;
   const basePrice = parseFloat(selectedPlan?.price || 0);
+  const cycle = selectedPlan?.billing_cycle || 'annual';
   const discountAmount = appliedCoupon ? parseFloat(appliedCoupon.discountAmount || 0) : 0;
-  const finalAmount = isTrial ? 0 : Math.max(0, basePrice - discountAmount);
+  const finalAmount = Math.max(0, basePrice - discountAmount);
+
+  // Validity description calculation for upfront paid bonus
+  const extendedValidityLabel =
+    cycle === 'annual'
+      ? `13 Months Total Access (12 Months Annual + ${trialDays > 0 ? `${trialDays} Days` : '1 Month'} Free Bonus)`
+      : cycle === 'monthly'
+      ? `2 Months Total Access (1 Month Paid + ${trialDays > 0 ? `${trialDays} Days` : '1 Month'} Free Bonus)`
+      : `Full ${cycle} + ${trialDays} Days Free Bonus`;
+
+  // GST Breakdown (18% inclusive inside the plan: 9% CGST + 9% SGST)
+  const taxableBase = finalAmount > 0 ? Math.round((finalAmount / 1.18) * 100) / 100 : 0;
+  const totalGst = finalAmount > 0 ? Math.round((finalAmount - taxableBase) * 100) / 100 : 0;
+  const cgst = Math.round((totalGst / 2) * 100) / 100;
+  const sgst = Math.round((totalGst - cgst) * 100) / 100;
 
   const portalUrl = process.env.NEXT_PUBLIC_PORTAL_URL || 'http://localhost:5174';
 
@@ -59,7 +72,7 @@ export default function StepReview({
       setCouponError('');
       const res = await saasApi.validateCoupon(couponCode.trim(), basePrice);
       if (res?.data) {
-        setAppliedCoupon(res.data);
+        if (setAppliedCoupon) setAppliedCoupon(res.data);
       } else {
         setCouponError(res?.message || 'Invalid coupon code.');
       }
@@ -70,12 +83,42 @@ export default function StepReview({
     }
   };
 
-  const handleCompleteRegistration = async (paymentProof = {}) => {
+  const handleRemoveCoupon = () => {
+    if (setAppliedCoupon) setAppliedCoupon(null);
+    if (setCouponCode) setCouponCode('');
+    setCouponError('');
+  };
+
+  const handleCompleteRegistration = async (paymentProof = {}, isTrialAction = false) => {
     try {
       setSubmitting(true);
       setErrorMessage('');
 
-      if (isTrial) {
+      setStatusMessage('Verifying contact and account availability...');
+      try {
+        const checkRes = await saasApi.checkAvailability({
+          admin_email: adminData.email,
+          admin_phone: adminData.phone,
+          school_email: campusContactData.email,
+          school_phone: campusContactData.phone_number,
+        });
+        if (checkRes?.data && !checkRes.data.available) {
+          setErrorMessage(checkRes.data.message || 'The entered email or phone number is already registered.');
+          setSubmitting(false);
+          setStatusMessage('');
+          return;
+        }
+      } catch (checkErr) {
+        const errMsg = checkErr.response?.data?.message || checkErr.message;
+        if (errMsg) {
+          setErrorMessage(errMsg);
+          setSubmitting(false);
+          setStatusMessage('');
+          return;
+        }
+      }
+
+      if (isTrialAction) {
         setStatusMessage('Verifying free trial eligibility with backend server...');
         try {
           const eligRes = await saasApi.checkTrialEligibility({
@@ -102,9 +145,9 @@ export default function StepReview({
       setStatusMessage('Provisioning institutional environment, campus schema, and database...');
       const payload = {
         plan_id: selectedPlan.id,
-        is_trial: isTrial,
-        amount_paid: finalAmount,
-        coupon_code: appliedCoupon ? appliedCoupon.code : null,
+        is_trial: isTrialAction,
+        amount_paid: isTrialAction ? 0 : finalAmount,
+        coupon_code: !isTrialAction && appliedCoupon ? appliedCoupon.code : null,
         school: {
           school_name: schoolProfileData.school_name,
           school_code: schoolProfileData.school_code || null,
@@ -137,8 +180,8 @@ export default function StepReview({
           picture: adminData.picture || null,
           password: adminData.password,
         },
-        payment_gateway: isTrial ? 'trial' : 'razorpay',
-        payment_transaction_id: paymentProof.paymentId || (isTrial ? `TRIAL_${Date.now()}` : null),
+        payment_gateway: isTrialAction ? 'trial' : 'razorpay',
+        payment_transaction_id: paymentProof.paymentId || (isTrialAction ? `TRIAL_${trialDays || 14}D_${Date.now()}` : null),
         razorpay_order_id: paymentProof.orderId || null,
         razorpay_payment_id: paymentProof.paymentId || null,
         razorpay_signature: paymentProof.signature || null,
@@ -169,20 +212,51 @@ export default function StepReview({
     }
   };
 
-  const handleInitiatePayment = async () => {
-    if (isTrial) {
-      await handleCompleteRegistration();
-      return;
-    }
+  const handleActivateTrial = async () => {
+    if (setIsTrialMode) setIsTrialMode(true);
+    await handleCompleteRegistration({}, true);
+  };
+
+  const handlePayAndActivate = async () => {
+    if (setIsTrialMode) setIsTrialMode(false);
 
     try {
       setSubmitting(true);
-      setStatusMessage('Initializing secure Razorpay payment gateway...');
       setErrorMessage('');
+
+      setStatusMessage('Verifying contact and account availability...');
+      try {
+        const checkRes = await saasApi.checkAvailability({
+          admin_email: adminData.email,
+          admin_phone: adminData.phone,
+          school_email: campusContactData.email,
+          school_phone: campusContactData.phone_number,
+        });
+        if (checkRes?.data && !checkRes.data.available) {
+          setErrorMessage(checkRes.data.message || 'The entered email or phone number is already registered.');
+          setSubmitting(false);
+          setStatusMessage('');
+          return;
+        }
+      } catch (checkErr) {
+        const errMsg = checkErr.response?.data?.message || checkErr.message;
+        if (errMsg) {
+          setErrorMessage(errMsg);
+          setSubmitting(false);
+          setStatusMessage('');
+          return;
+        }
+      }
+
+      setStatusMessage('Initializing secure Razorpay payment gateway...');
 
       const orderRes = await saasApi.createOrder({
         plan_id: selectedPlan.id,
         coupon_code: appliedCoupon ? appliedCoupon.code : null,
+        admin_email: adminData.email,
+        admin_phone: adminData.phone,
+        school_email: campusContactData.email,
+        school_phone: campusContactData.phone_number,
       });
 
       const orderData = orderRes?.data;
@@ -210,11 +284,14 @@ export default function StepReview({
           color: '#0d6efd',
         },
         handler: async (response) => {
-          await handleCompleteRegistration({
-            orderId: response.razorpay_order_id,
-            paymentId: response.razorpay_payment_id,
-            signature: response.razorpay_signature,
-          });
+          await handleCompleteRegistration(
+            {
+              orderId: response.razorpay_order_id,
+              paymentId: response.razorpay_payment_id,
+              signature: response.razorpay_signature,
+            },
+            false
+          );
         },
         modal: {
           ondismiss: () => {
@@ -411,14 +488,11 @@ export default function StepReview({
                     ? 'Others'
                     : 'Not Specified')}
               </div>
-              <div className="text-success fs-12 fw-semibold mt-1">
-                ✓ Unrestricted Super Administrator Privileges
-              </div>
             </div>
           </div>
         </div>
 
-        {/* Section 5: Plan & Pricing Summary */}
+        {/* Section 5: Plan & Pricing Summary with GST Breakdown */}
         <div className="col-12">
           <div className="p-4 bg-white rounded-3 border">
             <div className="d-flex justify-content-between align-items-center mb-3 pb-2 border-bottom">
@@ -428,66 +502,174 @@ export default function StepReview({
                 </span>
                 <h5 className="fw-bold text-dark mb-0">{selectedPlan.plan_name}</h5>
                 <span className="text-muted fs-13">
-                  {isTrial
-                    ? (trialDays > 0 ? `${trialDays}-Day Free Evaluation Access (No Credit Card Required)` : 'Free Evaluation Access (No Credit Card Required)')
-                    : `Billed ${selectedPlan.billing_cycle || 'monthly'}`}
+                  {hasTrialOption
+                    ? `Billed ${cycle} • Includes ${trialDays}-Day Free Trial Bonus when paid upfront`
+                    : isPureFreeOrTrial
+                    ? `Free Evaluation Access (${trialDays > 0 ? `${trialDays} Days` : 'No Credit Card Required'})`
+                    : `Billed ${cycle}`}
                 </span>
               </div>
               <div className="text-end">
                 <span className="fs-20 fw-bold text-primary">
-                  {isTrial ? '₹0' : `₹${Number(basePrice).toLocaleString('en-IN')}`}
+                  {basePrice === 0 ? 'Free' : `₹${Number(basePrice).toLocaleString('en-IN')}`}
                 </span>
+                {basePrice > 0 && (
+                  <div className="text-muted fs-11">
+                    (18% GST Included)
+                  </div>
+                )}
               </div>
             </div>
 
-            {/* Coupon Code Input for Paid Plans */}
-            {!isTrial && (
-              <div className="row g-2 align-items-center mb-3">
-                <div className="col-sm-8 col-md-6">
-                  <div className="input-group">
-                    <span className="input-group-text bg-light text-muted">
-                      <Tag size={16} />
-                    </span>
-                    <input
-                      type="text"
-                      className="form-control"
-                      placeholder="Enter promo / coupon code"
-                      value={couponCode}
-                      onChange={(e) => setCouponCode(e.target.value.toUpperCase())}
-                      disabled={Boolean(appliedCoupon)}
-                    />
-                    <button
-                      type="button"
-                      className="btn btn-outline-primary"
-                      onClick={handleApplyCoupon}
-                      disabled={validatingCoupon || !couponCode.trim() || Boolean(appliedCoupon)}
-                    >
-                      {validatingCoupon ? 'Checking...' : appliedCoupon ? 'Applied' : 'Apply'}
-                    </button>
-                  </div>
-                  {couponError && <div className="text-danger fs-12 mt-1">{couponError}</div>}
-                  {appliedCoupon && (
-                    <div className="text-success fs-12 mt-1">
-                      ✓ Coupon {appliedCoupon.code} applied! ₹{Number(discountAmount).toLocaleString('en-IN')} off.
-                    </div>
-                  )}
+            {/* Informational callout for plans offering both trial and paid activation */}
+            {hasTrialOption && (
+              <div className="p-3 bg-light rounded-3 border mb-3">
+                <div className="d-flex align-items-center gap-2 fw-bold text-dark fs-13 mb-1">
+                  <Sparkles size={16} className="text-primary flex-shrink-0" />
+                  <span>Flexible Activation Options Available:</span>
+                </div>
+                <div className="text-muted fs-12 mb-0">
+                  You can choose to <strong>Pay the regular plan price</strong> to receive your standard {cycle} term plus an extra <strong>+{trialDays} days free trial bonus</strong> ({extendedValidityLabel}), or <strong>Continue with the {trialDays}-day free trial</strong> at ₹0 today. Choose your preferred action button below.
                 </div>
               </div>
             )}
 
-            {/* Total Calculation */}
-            <div className="pt-2 border-top">
-              {!isTrial && discountAmount > 0 && (
-                <div className="d-flex justify-content-between text-muted fs-14 mb-1">
-                  <span>Discount:</span>
-                  <span className="text-success">- ₹{Number(discountAmount).toLocaleString('en-IN')}</span>
+            {/* Coupon Code Input for Paid Plans */}
+            {basePrice > 0 && (
+              <div className="p-3 bg-light rounded-3 border mb-3">
+                <div className="row g-2 align-items-center justify-content-between">
+                  <div className="col-12 col-md-6">
+                    <div className="d-flex align-items-center gap-1.5 fw-bold text-dark fs-13 mb-1">
+                      <Tag size={15} className="text-primary flex-shrink-0" />
+                      <span>Have a Coupon or Promo Code?</span>
+                    </div>
+                    <div className="text-muted fs-12">
+                      Apply your institutional discount code to reduce your subscription fee.
+                    </div>
+                  </div>
+
+                  <div className="col-12 col-md-5">
+                    <div className="input-group">
+                      <span className="input-group-text bg-white text-muted">
+                        <Tag size={15} />
+                      </span>
+                      <input
+                        type="text"
+                        className="form-control"
+                        placeholder="Enter coupon code"
+                        value={couponCode}
+                        onChange={(e) => {
+                          if (setCouponCode) setCouponCode(e.target.value.toUpperCase());
+                          if (couponError) setCouponError('');
+                        }}
+                        disabled={Boolean(appliedCoupon)}
+                      />
+                      {appliedCoupon ? (
+                        <button
+                          type="button"
+                          className="btn btn-outline-danger btn-sm"
+                          onClick={handleRemoveCoupon}
+                        >
+                          Remove
+                        </button>
+                      ) : (
+                        <button
+                          type="button"
+                          className="btn btn-primary"
+                          onClick={handleApplyCoupon}
+                          disabled={validatingCoupon || !couponCode.trim()}
+                        >
+                          {validatingCoupon ? (
+                            <>
+                              <Loader2 size={14} className="animate-spin me-1 inline" />
+                              <span>Checking...</span>
+                            </>
+                          ) : (
+                            'Apply'
+                          )}
+                        </button>
+                      )}
+                    </div>
+                    {couponError && <div className="text-danger fs-12 mt-1">{couponError}</div>}
+                    {appliedCoupon && (
+                      <div className="text-success fs-12 fw-semibold mt-1">
+                        ✓ Coupon <strong>{appliedCoupon.code}</strong> applied! You save ₹{Number(discountAmount).toLocaleString('en-IN')}.
+                      </div>
+                    )}
+                  </div>
                 </div>
-              )}
-              <div className="d-flex justify-content-between align-items-baseline">
-                <span className="fw-bold text-dark fs-16">Total Amount Payable:</span>
-                <span className="display-6 fw-bold text-success">
-                  {isTrial ? '₹0' : `₹${Number(finalAmount).toLocaleString('en-IN')}`}
-                </span>
+              </div>
+            )}
+
+            {/* Pricing & GST Tax Breakdown */}
+            <div className="pt-2">
+              <h6 className="fw-bold text-dark fs-13 text-uppercase mb-2.5">
+                Pricing &amp; Tax Breakdown:
+              </h6>
+
+              <div className="d-flex flex-column gap-2 fs-14">
+                <div className="d-flex justify-content-between text-muted">
+                  <span>Gross Plan Price:</span>
+                  <span>{basePrice === 0 ? '₹0.00' : `₹${Number(basePrice).toLocaleString('en-IN', { minimumFractionDigits: 2 })}`}</span>
+                </div>
+
+                {discountAmount > 0 && (
+                  <div className="d-flex justify-content-between text-success">
+                    <span>Coupon Discount ({appliedCoupon?.code}):</span>
+                    <span>- ₹{Number(discountAmount).toLocaleString('en-IN', { minimumFractionDigits: 2 })}</span>
+                  </div>
+                )}
+
+                {basePrice > 0 && (
+                  <>
+                    <div className="d-flex justify-content-between text-muted pt-2 border-top">
+                      <span>Net Taxable Base Amount:</span>
+                      <span>₹{taxableBase.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                    </div>
+
+                    <div className="d-flex justify-content-between text-muted ps-2 border-start border-2 border-primary-subtle">
+                      <span>CGST (9% Included):</span>
+                      <span>₹{cgst.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                    </div>
+
+                    <div className="d-flex justify-content-between text-muted ps-2 border-start border-2 border-primary-subtle">
+                      <span>SGST (9% Included):</span>
+                      <span>₹{sgst.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                    </div>
+
+                    <div className="d-flex justify-content-between text-muted fst-italic fs-12 ps-2">
+                      <span>Total Included GST (18% inside plan):</span>
+                      <span>₹{totalGst.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                    </div>
+                  </>
+                )}
+
+                {basePrice === 0 && (
+                  <div className="d-flex justify-content-between text-muted fst-italic fs-13 pt-1 border-top">
+                    <span>Applicable GST / Taxes:</span>
+                    <span>₹0.00 (Free Evaluation Access)</span>
+                  </div>
+                )}
+
+                <div className="d-flex justify-content-between align-items-baseline pt-2 border-top mt-1">
+                  <div>
+                    <span className="fw-bold text-dark fs-16 d-block">
+                      {hasTrialOption ? 'Total Amount if Paying Now:' : 'Total Amount Payable:'}
+                    </span>
+                    {basePrice > 0 && (
+                      <span className="text-muted fs-11">(All taxes &amp; 18% GST inclusive)</span>
+                    )}
+                  </div>
+                  <span className="display-6 fw-bold text-success">
+                    ₹{Number(finalAmount).toLocaleString('en-IN')}
+                  </span>
+                </div>
+
+                {hasTrialOption && (
+                  <div className="text-success fs-12 fw-semibold pt-1">
+                    ✓ Paying ₹{Number(finalAmount).toLocaleString('en-IN')} includes <strong>{extendedValidityLabel}</strong>. Or click &quot;Continue Free Trial&quot; below to start for ₹0 today.
+                  </div>
+                )}
               </div>
             </div>
           </div>
@@ -495,7 +677,7 @@ export default function StepReview({
       </div>
 
       {/* Action Navigation Buttons */}
-      <div className="d-flex justify-content-between pt-4 border-top">
+      <div className="d-flex flex-wrap justify-content-between align-items-center gap-3 pt-4 border-top">
         <button
           type="button"
           className="btn btn-outline-secondary px-4 py-2.5 fw-semibold d-flex align-items-center gap-2"
@@ -506,27 +688,90 @@ export default function StepReview({
           <span>Back: Super Admin</span>
         </button>
 
-        <button
-          type="button"
-          className={`btn ${isTrial ? 'btn-success' : 'btn-primary'} px-5 py-2.5 fw-semibold d-flex align-items-center gap-2 shadow-sm`}
-          onClick={handleInitiatePayment}
-          disabled={submitting}
-        >
-          {submitting ? (
+        <div className="d-flex flex-wrap align-items-center gap-2.5 ms-auto">
+          {/* Dual Action Buttons for Plans offering both Free Trial and Paid Upfront with Bonus */}
+          {hasTrialOption ? (
             <>
-              <Loader2 size={18} className="animate-spin" />
-              <span>Processing Activation...</span>
+              <button
+                type="button"
+                className="btn btn-outline-success px-4 py-2.5 fw-semibold d-flex align-items-center gap-2"
+                onClick={handleActivateTrial}
+                disabled={submitting}
+              >
+                {submitting ? (
+                  <>
+                    <Loader2 size={16} className="animate-spin" />
+                    <span>Processing...</span>
+                  </>
+                ) : (
+                  <>
+                    <ShieldCheck size={16} />
+                    <span>Continue {trialDays}-Day Free Trial (₹0)</span>
+                  </>
+                )}
+              </button>
+
+              <button
+                type="button"
+                className="btn btn-primary px-4 py-2.5 fw-semibold d-flex align-items-center gap-2 shadow-sm"
+                onClick={handlePayAndActivate}
+                disabled={submitting}
+              >
+                {submitting ? (
+                  <>
+                    <Loader2 size={16} className="animate-spin" />
+                    <span>Processing...</span>
+                  </>
+                ) : (
+                  <>
+                    <Sparkles size={16} />
+                    <span>Pay ₹{Number(finalAmount).toLocaleString('en-IN')} &amp; Activate (+{trialDays}D Bonus)</span>
+                  </>
+                )}
+              </button>
             </>
-          ) : isTrial ? (
-            <>
-              <span>🚀 Activate {trialDays > 0 ? `${trialDays}-Day ` : ''}Free Trial</span>
-            </>
+          ) : isPureFreeOrTrial || trialDays > 0 ? (
+            /* Pure Trial or 100% Free Plan */
+            <button
+              type="button"
+              className="btn btn-success px-5 py-2.5 fw-semibold d-flex align-items-center gap-2 shadow-sm"
+              onClick={handleActivateTrial}
+              disabled={submitting}
+            >
+              {submitting ? (
+                <>
+                  <Loader2 size={18} className="animate-spin" />
+                  <span>Activating...</span>
+                </>
+              ) : (
+                <>
+                  <ShieldCheck size={18} />
+                  <span>🚀 Activate {trialDays > 0 ? `${trialDays}-Day ` : ''}Free Trial</span>
+                </>
+              )}
+            </button>
           ) : (
-            <>
-              <span>💳 Pay ₹{Number(finalAmount).toLocaleString('en-IN')} &amp; Activate</span>
-            </>
+            /* Standard Paid Plan without Free Trial */
+            <button
+              type="button"
+              className="btn btn-primary px-5 py-2.5 fw-semibold d-flex align-items-center gap-2 shadow-sm"
+              onClick={handlePayAndActivate}
+              disabled={submitting}
+            >
+              {submitting ? (
+                <>
+                  <Loader2 size={18} className="animate-spin" />
+                  <span>Processing...</span>
+                </>
+              ) : (
+                <>
+                  <CreditCard size={18} />
+                  <span>💳 Pay ₹{Number(finalAmount).toLocaleString('en-IN')} &amp; Activate</span>
+                </>
+              )}
+            </button>
           )}
-        </button>
+        </div>
       </div>
     </div>
   );

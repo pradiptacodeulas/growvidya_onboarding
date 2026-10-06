@@ -26,6 +26,11 @@ export const saasApi = {
     return res.data;
   },
 
+  checkAvailability: async (data) => {
+    const res = await apiClient.post('/saas/check-availability', data);
+    return res.data;
+  },
+
   getCountries: async () => {
     const res = await apiClient.get('/saas/locations/countries');
     return res.data;

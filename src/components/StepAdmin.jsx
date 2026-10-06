@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { ArrowLeft, ArrowRight, UserCheck, Eye, EyeOff, ShieldAlert, Lock, Mail, Phone, Upload, User } from 'lucide-react';
+import { ArrowLeft, ArrowRight, UserCheck, Eye, EyeOff, Lock, Mail, Phone, Upload, User, Loader2 } from 'lucide-react';
 import saasApi from '../lib/api';
 
 export default function StepAdmin({
@@ -15,6 +15,7 @@ export default function StepAdmin({
   const [photoPreview, setPhotoPreview] = useState(formData.picture || null);
   const [genders, setGenders] = useState([]);
   const [loadingGenders, setLoadingGenders] = useState(false);
+  const [checkingAvailability, setCheckingAvailability] = useState(false);
   const [errors, setErrors] = useState({});
 
   useEffect(() => {
@@ -81,7 +82,7 @@ export default function StepAdmin({
     setFormData((prev) => ({ ...prev, picture: null }));
   };
 
-  const handleValidateAndNext = () => {
+  const handleValidateAndNext = async () => {
     const newErrors = {};
 
     if (!formData.first_name || !formData.first_name.trim()) {
@@ -113,6 +114,39 @@ export default function StepAdmin({
       return;
     }
 
+    try {
+      setCheckingAvailability(true);
+      const res = await saasApi.checkAvailability({
+        admin_email: formData.email.trim(),
+        admin_phone: formData.phone.trim(),
+      });
+
+      if (res?.data && !res.data.available) {
+        const field = res.data.field;
+        if (field === 'admin_email') {
+          setErrors((prev) => ({ ...prev, email: res.data.message }));
+        } else if (field === 'admin_phone') {
+          setErrors((prev) => ({ ...prev, phone: res.data.message }));
+        } else {
+          setErrors((prev) => ({ ...prev, general: res.data.message }));
+        }
+        return;
+      }
+    } catch (err) {
+      const errorMsg = err.response?.data?.message;
+      if (errorMsg) {
+        if (errorMsg.toLowerCase().includes('email')) {
+          setErrors((prev) => ({ ...prev, email: errorMsg }));
+          return;
+        } else if (errorMsg.toLowerCase().includes('phone')) {
+          setErrors((prev) => ({ ...prev, phone: errorMsg }));
+          return;
+        }
+      }
+    } finally {
+      setCheckingAvailability(false);
+    }
+
     onNext();
   };
 
@@ -127,13 +161,6 @@ export default function StepAdmin({
           <p className="text-muted fs-13 mb-0">
             Create the primary administrator credentials and profile to govern your school portal.
           </p>
-        </div>
-      </div>
-
-      <div className="alert alert-primary-subtle text-primary border border-primary-subtle rounded-3 py-2 px-3 fs-13 mb-4 d-flex align-items-center gap-2">
-        <ShieldAlert size={18} className="flex-shrink-0" />
-        <div>
-          This account will have <strong>unrestricted Super Administrator privileges</strong> across all modules and campus settings.
         </div>
       </div>
 
@@ -353,9 +380,19 @@ export default function StepAdmin({
           type="button"
           className="btn btn-primary px-4 py-2.5 fw-semibold d-flex align-items-center gap-2"
           onClick={handleValidateAndNext}
+          disabled={checkingAvailability}
         >
-          <span>Continue: Review &amp; Activate</span>
-          <ArrowRight size={16} />
+          {checkingAvailability ? (
+            <>
+              <Loader2 size={16} className="animate-spin" />
+              <span>Checking Availability...</span>
+            </>
+          ) : (
+            <>
+              <span>Continue: Review &amp; Activate</span>
+              <ArrowRight size={16} />
+            </>
+          )}
         </button>
       </div>
     </div>
