@@ -276,13 +276,30 @@ export default function StepPlan({
     }, 0);
   }, [selectedMachines, attendanceMachines]);
 
-  const cardsTotal = useMemo(() => {
-    return Object.entries(selectedCards).reduce((sum, [id, qty]) => {
-      const c = rfidCards.find((item) => Number(item.id) === Number(id));
-      if (!c || qty <= 0) return sum;
-      return sum + parseFloat(c.unit_price || 0) * qty;
-    }, 0);
+  const selectedCardsList = useMemo(() => {
+    return Object.entries(selectedCards)
+      .map(([id, qty]) => {
+        const c = rfidCards.find((item) => Number(item.id) === Number(id));
+        if (!c || qty <= 0) return null;
+        const unitPrice = parseFloat(c.unit_price || 0);
+        return {
+          id: c.id,
+          card_name: c.card_name,
+          quantity: qty,
+          unitPrice,
+          total: unitPrice * qty,
+        };
+      })
+      .filter(Boolean);
   }, [selectedCards, rfidCards]);
+
+  const totalCardsQty = useMemo(() => {
+    return selectedCardsList.reduce((sum, item) => sum + item.quantity, 0);
+  }, [selectedCardsList]);
+
+  const cardsTotal = useMemo(() => {
+    return selectedCardsList.reduce((sum, item) => sum + item.total, 0);
+  }, [selectedCardsList]);
 
   const notificationsTotal = useMemo(() => {
     return Object.entries(selectedNotifications).reduce((sum, [id, cfg]) => {
@@ -318,11 +335,13 @@ export default function StepPlan({
   );
 
   return (
-    <div className="d-flex flex-column gap-4">
-      {/* ============================================================ */}
-      {/* CONTAINER 1: SELECTED PLAN DETAILS CONTAINER                 */}
-      {/* ============================================================ */}
-      <div className="card border-0 shadow-sm rounded-4 p-4 p-md-5">
+    <div className="row g-4">
+      {/* LEFT COLUMN: Plan Details & Add-ons Customization */}
+      <div className="col-12 col-md-7 col-lg-8 d-flex flex-column gap-4">
+        {/* ============================================================ */}
+        {/* CONTAINER 1: SELECTED PLAN DETAILS CONTAINER                 */}
+        {/* ============================================================ */}
+        <div className="card border-0 shadow-sm rounded-4 p-4 p-md-5">
         {/* Plan Header */}
         <div className="d-flex flex-wrap justify-content-between align-items-center mb-4 pb-3 border-bottom gap-3">
           <div>
@@ -532,7 +551,7 @@ export default function StepPlan({
                           : parseFloat(st.annual_price || 0);
 
                       return (
-                        <div key={st.id} className="col-12 col-sm-6 col-lg-3">
+                        <div key={st.id} className="col-12 col-sm-6 col-xl-3">
                           <div
                             className={`p-3 rounded-3 border h-100 cursor-pointer transition-all ${
                               isSelected
@@ -965,200 +984,203 @@ export default function StepPlan({
           )}
         </div>
       </div>
+    </div>
+    {/* END LEFT COLUMN */}
 
       {/* ============================================================ */}
-      {/* CONTAINER 3: LIVE PRICING & DYNAMIC BREAKDOWN CONTAINER      */}
+      {/* RIGHT COLUMN: STICKY LIVE PRICING & INVESTMENT BREAKDOWN     */}
       {/* ============================================================ */}
-      <div className="card border-0 shadow-sm rounded-4 p-4 p-md-5 border-start border-4 border-primary">
-        <div className="d-flex align-items-center justify-content-between mb-3 pb-2 border-bottom">
-          <div className="d-flex align-items-center gap-2">
-            <Receipt size={22} className="text-primary" />
-            <h5 className="fw-bold text-dark mb-0">Configured Investment Breakdown</h5>
-          </div>
-          <span className="badge bg-primary-subtle text-primary border border-primary-subtle rounded-pill px-3 py-1 fs-12 fw-bold">
-            Live Pricing
-          </span>
-        </div>
-
-        <p className="text-muted fs-13 mb-3">
-          This breakdown updates dynamically in real-time as you customize plan options and add-ons below:
-        </p>
-
-        {/* Itemized Rows */}
-        <div className="d-flex flex-column gap-2 mb-3">
-          {/* Base Plan Row */}
-          <div className="d-flex justify-content-between align-items-center py-2 border-bottom">
-            <div>
-              <div className="fw-semibold text-dark fs-14">
-                {selectedPlan.plan_name} Software Package
-                <span className="text-muted fs-12 ms-2 text-capitalize">({cycle})</span>
-              </div>
-              <div className="text-muted fs-12">
-                Up to {selectedPlan.max_students ? Number(selectedPlan.max_students).toLocaleString() : 'Unlimited'} students
-                {trialDays > 0 && ` • Includes ${trialDays}-day free trial`}
-              </div>
-            </div>
-            <div className="text-end">
-              {isTrialMode ? (
-                <div>
-                  <span className="fw-bold text-success fs-14">₹0.00</span>
-                  <div className="badge bg-success-subtle text-success fs-10 px-2 py-0.5">Free Trial Active</div>
-                </div>
-              ) : (
-                <span className="fw-bold text-dark fs-14">
-                  ₹{basePrice.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
-                </span>
-              )}
-            </div>
+      <div className="col-12 col-md-5 col-lg-4" style={{ alignSelf: 'stretch' }}>
+        <div className="card border-0 shadow-sm rounded-4 p-4 border-start border-4 border-primary sticky-pricing-sidebar">
+          <div className="d-flex align-items-center gap-2 mb-3 pb-2 border-bottom">
+            <Receipt size={20} className="text-primary flex-shrink-0" />
+            <h5 className="fw-bold text-dark mb-0 fs-16">Investment Breakdown</h5>
           </div>
 
-          {/* Storage Add-on Row */}
-          {selectedStorage && (
-            <div className="d-flex justify-content-between align-items-center py-2 border-bottom">
-              <div>
-                <div className="fw-semibold text-dark fs-14 d-flex align-items-center gap-2">
-                  <HardDrive size={15} className="text-primary" />
-                  <span>Cloud Storage: {selectedStorage.plan_name} ({selectedStorage.storage_capacity} GB)</span>
+          {/* Itemized Rows */}
+          <div className="d-flex flex-column gap-2 mb-3">
+            {/* Base Plan Row */}
+            <div className="d-flex justify-content-between align-items-start py-2 border-bottom">
+              <div className="pe-2">
+                <div className="fw-semibold text-dark fs-14">
+                  {selectedPlan.plan_name} Package
+                  <span className="text-muted fs-12 ms-2 text-capitalize">({cycle})</span>
                 </div>
-                <div className="text-muted fs-12">Institutional cloud backup &amp; archiving</div>
+                <div className="text-muted fs-12">
+                  Up to {selectedPlan.max_students ? Number(selectedPlan.max_students).toLocaleString() : 'Unlimited'} students
+                  {trialDays > 0 && ` • ${trialDays}-day trial`}
+                </div>
               </div>
-              <div className="text-end">
-                <span className="fw-bold text-primary fs-14">
-                  +₹{storagePrice.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
-                </span>
-              </div>
-            </div>
-          )}
-
-          {/* Biometric Machines Rows */}
-          {Object.entries(selectedMachines).map(([id, qty]) => {
-            const m = attendanceMachines.find((item) => Number(item.id) === Number(id));
-            if (!m || qty <= 0) return null;
-            const sub = parseFloat(m.unit_price || 0) * qty;
-
-            return (
-              <div key={`m-${id}`} className="d-flex justify-content-between align-items-center py-2 border-bottom">
-                <div>
-                  <div className="fw-semibold text-dark fs-14 d-flex align-items-center gap-2">
-                    <Cpu size={15} className="text-success" />
-                    <span>{m.machine_name} (Qty: {qty})</span>
+              <div className="text-end flex-shrink-0">
+                {isTrialMode ? (
+                  <div>
+                    <span className="fw-bold text-success fs-14">₹0.00</span>
+                    <div className="badge bg-success-subtle text-success fs-10 px-2 py-0.5">Free Trial Active</div>
                   </div>
-                  <div className="text-muted fs-12">₹{parseFloat(m.unit_price || 0).toLocaleString('en-IN')} / device</div>
+                ) : (
+                  <span className="fw-bold text-dark fs-14">
+                    ₹{basePrice.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                  </span>
+                )}
+              </div>
+            </div>
+
+            {/* Storage Add-on Row */}
+            {selectedStorage && (
+              <div className="d-flex justify-content-between align-items-start py-2 border-bottom">
+                <div className="pe-2">
+                  <div className="fw-semibold text-dark fs-14 d-flex align-items-center gap-2">
+                    <HardDrive size={15} className="text-primary flex-shrink-0" />
+                    <span>Cloud Storage: {selectedStorage.plan_name}</span>
+                  </div>
+                  <div className="text-muted fs-12">{selectedStorage.storage_capacity} GB backup &amp; archiving</div>
                 </div>
-                <div className="text-end">
-                  <span className="fw-bold text-success fs-14">
-                    +₹{sub.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                <div className="text-end flex-shrink-0">
+                  <span className="fw-bold text-primary fs-14">
+                    +₹{storagePrice.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
                   </span>
                 </div>
               </div>
-            );
-          })}
+            )}
 
-          {/* RFID Cards Rows */}
-          {Object.entries(selectedCards).map(([id, qty]) => {
-            const c = rfidCards.find((item) => Number(item.id) === Number(id));
-            if (!c || qty <= 0) return null;
-            const sub = parseFloat(c.unit_price || 0) * qty;
+            {/* Biometric Machines Rows */}
+            {Object.entries(selectedMachines).map(([id, qty]) => {
+              const m = attendanceMachines.find((item) => Number(item.id) === Number(id));
+              if (!m || qty <= 0) return null;
+              const sub = parseFloat(m.unit_price || 0) * qty;
 
-            return (
-              <div key={`c-${id}`} className="d-flex justify-content-between align-items-center py-2 border-bottom">
-                <div>
-                  <div className="fw-semibold text-dark fs-14 d-flex align-items-center gap-2">
-                    <IdCard size={15} className="text-warning-emphasis" />
-                    <span>{c.card_name} (Qty: {qty} cards)</span>
+              return (
+                <div key={`m-${id}`} className="d-flex justify-content-between align-items-center py-2 border-bottom">
+                  <div className="pe-2">
+                    <div className="fw-semibold text-dark fs-14 d-flex align-items-center gap-2">
+                      <Cpu size={15} className="text-success flex-shrink-0" />
+                      <span>{m.machine_name} (×{qty})</span>
+                    </div>
                   </div>
-                  <div className="text-muted fs-12">₹{parseFloat(c.unit_price || 0).toLocaleString('en-IN')} / card</div>
+                  <div className="text-end flex-shrink-0">
+                    <span className="fw-bold text-success fs-14">
+                      +₹{sub.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                    </span>
+                  </div>
                 </div>
-                <div className="text-end">
+              );
+            })}
+
+            {/* RFID Cards - Consolidated in a Single Row (Real Bill format) */}
+            {selectedCardsList.length > 0 && (
+              <div className="d-flex justify-content-between align-items-start py-2 border-bottom">
+                <div className="pe-2">
+                  <div className="fw-semibold text-dark fs-14 d-flex align-items-center gap-2">
+                    <IdCard size={15} className="text-warning-emphasis flex-shrink-0" />
+                    <span>
+                      {selectedCardsList.length === 1
+                        ? `Smart RFID Cards: ${selectedCardsList[0].card_name} (×${selectedCardsList[0].quantity})`
+                        : `Smart RFID Cards (Total: ${totalCardsQty} cards)`}
+                    </span>
+                  </div>
+                  <div className="text-muted fs-12 mt-0.5">
+                    {selectedCardsList.length === 1 ? (
+                      `₹${selectedCardsList[0].unitPrice.toLocaleString('en-IN')} / card`
+                    ) : (
+                      selectedCardsList.map((c, idx) => (
+                        <span key={c.id}>
+                          {idx > 0 && <span className="mx-1.5 text-secondary">•</span>}
+                          {c.card_name}: {c.quantity} pcs @ ₹{c.unitPrice.toLocaleString('en-IN')} (₹{c.total.toLocaleString('en-IN')})
+                        </span>
+                      ))
+                    )}
+                  </div>
+                </div>
+                <div className="text-end flex-shrink-0">
                   <span className="fw-bold text-warning-emphasis fs-14">
-                    +₹{sub.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                    +₹{cardsTotal.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
                   </span>
                 </div>
               </div>
-            );
-          })}
+            )}
 
-          {/* Notification Bundles Rows */}
-          {Object.entries(selectedNotifications).map(([id, cfg]) => {
-            if (!cfg?.selected || !cfg?.quantity) return null;
-            const n = notificationRecords.find((item) => Number(item.id) === Number(id));
-            if (!n) return null;
-            const sub = Math.round(parseFloat(n.cost || 0) * cfg.quantity * 100) / 100;
+            {/* Notification Bundles Rows */}
+            {Object.entries(selectedNotifications).map(([id, cfg]) => {
+              if (!cfg?.selected || !cfg?.quantity) return null;
+              const n = notificationRecords.find((item) => Number(item.id) === Number(id));
+              if (!n) return null;
+              const sub = Math.round(parseFloat(n.cost || 0) * cfg.quantity * 100) / 100;
 
-            return (
-              <div key={`n-${id}`} className="d-flex justify-content-between align-items-center py-2 border-bottom">
-                <div>
-                  <div className="fw-semibold text-dark fs-14 d-flex align-items-center gap-2">
-                    <BellRing size={15} className="text-info" />
-                    <span className="text-capitalize">{n.type} Broadcast Credits ({cfg.quantity} credits)</span>
+              return (
+                <div key={`n-${id}`} className="d-flex justify-content-between align-items-start py-2 border-bottom">
+                  <div className="pe-2">
+                    <div className="fw-semibold text-dark fs-14 d-flex align-items-center gap-2">
+                      <BellRing size={15} className="text-info flex-shrink-0" />
+                      <span className="text-capitalize">{n.type} Credits ({Number(cfg.quantity).toLocaleString()})</span>
+                    </div>
+                    <div className="text-muted fs-12">₹{parseFloat(n.cost || 0).toFixed(2)} / credit</div>
                   </div>
-                  <div className="text-muted fs-12">₹{parseFloat(n.cost || 0).toFixed(2)} / credit</div>
+                  <div className="text-end flex-shrink-0">
+                    <span className="fw-bold text-info fs-14">
+                      +₹{sub.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                    </span>
+                  </div>
                 </div>
-                <div className="text-end">
-                  <span className="fw-bold text-info fs-14">
-                    +₹{sub.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
-                  </span>
+              );
+            })}
+
+            {addonsTotal === 0 && (
+              <div className="text-muted fs-12 py-1 fst-italic">
+                No optional add-ons selected. Only standard base software license included.
+              </div>
+            )}
+          </div>
+
+          {/* Subtotal & Tax Calculation */}
+          <div className="p-3 bg-light rounded-3 mb-3">
+            <div className="d-flex justify-content-between align-items-center fs-13 mb-1.5">
+              <span className="text-muted">Net Taxable Base:</span>
+              <span className="fw-semibold text-dark">
+                ₹{taxableBase.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+              </span>
+            </div>
+            <div className="d-flex justify-content-between align-items-center fs-13 mb-2">
+              <span className="text-muted">GST Included (18%):</span>
+              <span className="fw-semibold text-dark">
+                ₹{totalGst.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+              </span>
+            </div>
+            <div className="d-flex justify-content-between align-items-center pt-2 border-top">
+              <div>
+                <span className="fs-15 fw-bold text-dark">Total Configured:</span>
+                <div className="fs-11 text-muted">
+                  {isTrialMode
+                    ? `(Software free for ${trialDays}d; add-ons payable)`
+                    : '(All applicable taxes included)'}
                 </div>
               </div>
-            );
-          })}
+              <div className="fs-20 fw-bold text-primary">
+                ₹{grandTotal.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+              </div>
+            </div>
+          </div>
 
-          {addonsTotal === 0 && (
-            <div className="text-muted fs-12 py-1 fst-italic">
-              No optional add-ons selected. Only standard base software license included.
+          {/* Free trial notification note */}
+          {isTrialMode && grandTotal === 0 && (
+            <div className="p-2.5 rounded-3 bg-success-subtle text-success border border-success-subtle fs-12 mb-3 d-flex align-items-center gap-2">
+              <ShieldCheck size={16} className="flex-shrink-0" />
+              <span>
+                <strong>100% Free Trial:</strong> ₹0 payable today. Instant activation for {trialDays} days.
+              </span>
             </div>
           )}
-        </div>
 
-        {/* Subtotal & Tax Calculation */}
-        <div className="p-3 bg-light rounded-3 mb-3">
-          <div className="d-flex justify-content-between align-items-center fs-14 mb-1">
-            <span className="text-muted">Net Taxable Base:</span>
-            <span className="fw-semibold text-dark">
-              ₹{taxableBase.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
-            </span>
+          {/* Action Button */}
+          <div className="pt-2">
+            <button
+              type="button"
+              className="btn btn-primary w-100 py-2.5 fw-semibold d-flex align-items-center justify-content-center gap-2 fs-15 shadow-sm"
+              onClick={onNext}
+            >
+              <span>Continue: School Profile</span>
+              <ArrowRight size={16} />
+            </button>
           </div>
-          <div className="d-flex justify-content-between align-items-center fs-14 mb-2">
-            <span className="text-muted">GST Included (18%):</span>
-            <span className="fw-semibold text-dark">
-              ₹{totalGst.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
-            </span>
-          </div>
-          <div className="d-flex justify-content-between align-items-center pt-2 border-top">
-            <div>
-              <span className="fs-16 fw-bold text-dark">Total Configured Amount:</span>
-              <div className="fs-11 text-muted">
-                {isTrialMode
-                  ? `(Software free for ${trialDays} days; hardware/add-ons payable)`
-                  : '(All applicable taxes included)'}
-              </div>
-            </div>
-            <div className="fs-22 fw-bold text-primary">
-              ₹{grandTotal.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
-            </div>
-          </div>
-        </div>
-
-        {/* Free trial notification note */}
-        {isTrialMode && grandTotal === 0 && (
-          <div className="p-2.5 rounded-3 bg-success-subtle text-success border border-success-subtle fs-12 mb-3 d-flex align-items-center gap-2">
-            <ShieldCheck size={16} className="flex-shrink-0" />
-            <span>
-              <strong>100% Free Trial:</strong> ₹0 payable today. Instant activation for {trialDays} days.
-            </span>
-          </div>
-        )}
-
-        {/* Action Button */}
-        <div className="d-flex justify-content-end pt-3 border-top mt-2">
-          <button
-            type="button"
-            className="btn btn-primary px-4 py-2.5 fw-semibold d-flex align-items-center gap-2 fs-15 shadow-sm"
-            onClick={onNext}
-          >
-            <span>Continue: School Profile</span>
-            <ArrowRight size={16} />
-          </button>
         </div>
       </div>
     </div>

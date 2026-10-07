@@ -169,7 +169,7 @@ function RegisterContent() {
   }
 
   return (
-    <div className="container py-4 py-md-5" style={{ maxWidth: '1020px' }}>
+    <div className="container py-4 py-md-5" style={{ maxWidth: currentStep === 0 ? '1380px' : '1020px' }}>
       <Stepper currentStep={currentStep} steps={STEPS} />
 
       {/* Step 0: Plan & Configuration */}

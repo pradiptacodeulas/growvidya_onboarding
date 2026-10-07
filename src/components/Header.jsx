@@ -18,9 +18,6 @@ export default function Header() {
             style={{ objectFit: 'contain', width: 'auto', height: '42px' }}
             priority
           />
-          <span className="badge bg-primary-subtle text-primary border border-primary-subtle rounded-pill px-3 py-1 fs-12 fw-semibold d-none d-sm-inline">
-            ✨ Institution Onboarding Portal
-          </span>
         </div>
 
         <div className="d-flex align-items-center gap-3">

@@ -737,12 +737,27 @@ export default function StepReview({
                   </div>
                 ))}
 
-                {cardsList.map((c) => (
-                  <div key={c.id} className="d-flex justify-content-between text-dark">
-                    <span>Smart RFID Cards ({c.card_name} x {c.quantity}):</span>
-                    <span>+₹{Number(c.total).toLocaleString('en-IN', { minimumFractionDigits: 2 })}</span>
+                {cardsList.length === 1 ? (
+                  <div className="d-flex justify-content-between text-dark">
+                    <span>Smart RFID Cards ({cardsList[0].card_name} x {cardsList[0].quantity}):</span>
+                    <span>+₹{Number(cardsList[0].total).toLocaleString('en-IN', { minimumFractionDigits: 2 })}</span>
                   </div>
-                ))}
+                ) : cardsList.length > 1 ? (
+                  <div className="d-flex justify-content-between text-dark">
+                    <div>
+                      <span>Smart RFID Cards (Total: {cardsList.reduce((sum, c) => sum + c.quantity, 0)} cards):</span>
+                      <div className="text-muted fs-12 mt-0.5">
+                        {cardsList.map((c, i) => (
+                          <span key={c.id}>
+                            {i > 0 && <span className="mx-1">•</span>}
+                            {c.card_name}: {c.quantity} pcs @ ₹{c.unitPrice.toLocaleString('en-IN')} (₹{c.total.toLocaleString('en-IN')})
+                          </span>
+                        ))}
+                      </div>
+                    </div>
+                    <span className="flex-shrink-0 ms-2">+₹{Number(cardsTotal).toLocaleString('en-IN', { minimumFractionDigits: 2 })}</span>
+                  </div>
+                ) : null}
 
                 {notificationsList.map((n) => (
                   <div key={n.id} className="d-flex justify-content-between text-dark">

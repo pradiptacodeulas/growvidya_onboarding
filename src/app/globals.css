@@ -129,3 +129,30 @@ body {
   }
 }
 
+/* Sticky pricing sidebar for plan configuration */
+@media (min-width: 768px) {
+  .sticky-pricing-sidebar {
+    position: -webkit-sticky !important;
+    position: sticky !important;
+    top: 90px !important;
+    max-height: calc(100vh - 110px) !important;
+    overflow-y: auto !important;
+    z-index: 100 !important;
+  }
+}
+
+.sticky-pricing-sidebar::-webkit-scrollbar {
+  width: 5px;
+}
+.sticky-pricing-sidebar::-webkit-scrollbar-track {
+  background: transparent;
+}
+.sticky-pricing-sidebar::-webkit-scrollbar-thumb {
+  background: #cbd5e1;
+  border-radius: 4px;
+}
+.sticky-pricing-sidebar::-webkit-scrollbar-thumb:hover {
+  background: #94a3b8;
+}
+
+
