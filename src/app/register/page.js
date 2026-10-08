@@ -62,6 +62,7 @@ function RegisterContent() {
     affiliation_board: '',
     medium_of_instruction: '',
     established_year: '',
+    registration_type: 'single',
     school_logo: null,
   });
 

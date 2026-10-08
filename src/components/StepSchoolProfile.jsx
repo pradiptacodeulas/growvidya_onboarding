@@ -207,6 +207,74 @@ export default function StepSchoolProfile({
           )}
         </div>
 
+        {/* Campus Architecture / Registration Type */}
+        <div className="col-12 mt-4 pt-3 border-top">
+          <label className="form-label d-block fw-bold text-dark mb-2">
+            Campus Architecture / Registration Type
+          </label>
+          <div className="row g-3">
+            <div className="col-12 col-md-6">
+              <div
+                className={`p-3 rounded-3 border transition-all ${
+                  (formData.registration_type || 'single') === 'single'
+                    ? 'border-primary bg-primary-subtle'
+                    : 'border-light-subtle bg-white'
+                }`}
+                style={{ cursor: 'pointer' }}
+                onClick={() => setFormData((prev) => ({ ...prev, registration_type: 'single' }))}
+              >
+                <div className="d-flex align-items-center gap-2 mb-1">
+                  <input
+                    type="radio"
+                    id="reg_type_single"
+                    name="registration_type"
+                    checked={(formData.registration_type || 'single') === 'single'}
+                    onChange={() => setFormData((prev) => ({ ...prev, registration_type: 'single' }))}
+                    className="form-check-input mt-0"
+                  />
+                  <label htmlFor="reg_type_single" className="fw-bold mb-0 text-dark" style={{ cursor: 'pointer' }}>
+                    Single Campus
+                  </label>
+                  <span className="badge bg-secondary-subtle text-secondary small ms-auto">Standard</span>
+                </div>
+                <p className="text-muted fs-12 mb-0 ms-4">
+                  For standalone schools operating a single campus.
+                </p>
+              </div>
+            </div>
+
+            <div className="col-12 col-md-6">
+              <div
+                className={`p-3 rounded-3 border transition-all ${
+                  formData.registration_type === 'multiple'
+                    ? 'border-primary bg-primary-subtle'
+                    : 'border-light-subtle bg-white'
+                }`}
+                style={{ cursor: 'pointer' }}
+                onClick={() => setFormData((prev) => ({ ...prev, registration_type: 'multiple' }))}
+              >
+                <div className="d-flex align-items-center gap-2 mb-1">
+                  <input
+                    type="radio"
+                    id="reg_type_multiple"
+                    name="registration_type"
+                    checked={formData.registration_type === 'multiple'}
+                    onChange={() => setFormData((prev) => ({ ...prev, registration_type: 'multiple' }))}
+                    className="form-check-input mt-0"
+                  />
+                  <label htmlFor="reg_type_multiple" className="fw-bold mb-0 text-dark" style={{ cursor: 'pointer' }}>
+                    Multiple Campuses / School Group
+                  </label>
+                  <span className="badge bg-primary text-white small ms-auto">Multi-Branch</span>
+                </div>
+                <p className="text-muted fs-12 mb-0 ms-4">
+                  Creates Main Campus and unlocks the dedicated Super Admin Organization Dashboard.
+                </p>
+              </div>
+            </div>
+          </div>
+        </div>
+
         {/* Official School Logo */}
         <div className="col-12 mt-4 pt-3 border-top">
           <label className="form-label d-block">Official School Logo / Crest</label>
