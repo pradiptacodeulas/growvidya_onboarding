@@ -199,6 +199,7 @@ export default function StepReview({
           affiliation_board: schoolProfileData.affiliation_board || null,
           medium_of_instruction: schoolProfileData.medium_of_instruction || null,
           established_year: schoolProfileData.established_year || null,
+          registration_type: schoolProfileData.registration_type === 'multiple' ? 'multiple' : 'single',
           school_logo: schoolProfileData.school_logo || null,
           phone_number: campusContactData.phone_number || null,
           email: campusContactData.email || null,
