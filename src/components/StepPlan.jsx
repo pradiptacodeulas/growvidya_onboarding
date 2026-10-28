@@ -389,12 +389,24 @@ export default function StepPlan({
                 </div>
                 <div className="fs-16 fw-bold text-dark">
                   {selectedPlan.max_students > 0
-                    ? `Up to ${Number(selectedPlan.max_students).toLocaleString()}`
-                    : 'Unlimited'}
+                    ? `Up to ${Number(selectedPlan.max_students).toLocaleString()} Students`
+                    : 'Unlimited Students'}
                 </div>
               </div>
             </div>
           )}
+
+          <div className="col-sm-6 col-lg-3">
+            <div className="p-3 bg-light rounded-3 border h-100">
+              <div className="d-flex align-items-center gap-2 mb-1">
+                <HardDrive size={18} className="text-primary" />
+                <span className="fs-12 text-muted fw-semibold">Cloud Storage</span>
+              </div>
+              <div className="fs-16 fw-bold text-dark">
+                5 GB Included
+              </div>
+            </div>
+          </div>
 
           {trialDays > 0 && (
             <div className="col-sm-6 col-lg-3">
@@ -573,7 +585,7 @@ export default function StepPlan({
                               </div>
                             </div>
                             <div className="fs-13 text-muted mb-2">
-                              Capacity: <strong>{st.storage_capacity} GB</strong>
+                              Capacity: <strong>{st.storage_capacity} {st.unit_code || (st.capacity_unit_id === 3 ? 'TB' : 'GB')}</strong>
                             </div>
                             <div className="fs-16 fw-bold text-primary">
                               ₹{price.toLocaleString('en-IN')}
@@ -678,6 +690,12 @@ export default function StepPlan({
                                 {m.brand && <span className="me-2">Brand: {m.brand}</span>}
                                 {m.model_number && <span>Model: {m.model_number}</span>}
                               </div>
+                              {(m.user_capacity || m.log_capacity) && (
+                                <div className="fs-12 text-muted mb-1">
+                                  {m.user_capacity && <span className="me-2">Capacity: {Number(m.user_capacity).toLocaleString()} Users</span>}
+                                  {m.log_capacity && <span>({Number(m.log_capacity).toLocaleString()} Logs)</span>}
+                                </div>
+                              )}
                               <div className="fs-16 fw-bold text-success">
                                 ₹{parseFloat(m.unit_price || 0).toLocaleString('en-IN')}
                                 <span className="fs-11 text-muted fw-normal"> / unit</span>
@@ -1033,7 +1051,7 @@ export default function StepPlan({
                     <HardDrive size={15} className="text-primary flex-shrink-0" />
                     <span>Cloud Storage: {selectedStorage.plan_name}</span>
                   </div>
-                  <div className="text-muted fs-12">{selectedStorage.storage_capacity} GB backup &amp; archiving</div>
+                  <div className="text-muted fs-12">{selectedStorage.storage_capacity} {selectedStorage.unit_code || (selectedStorage.capacity_unit_id === 3 ? 'TB' : 'GB')} backup &amp; archiving</div>
                 </div>
                 <div className="text-end flex-shrink-0">
                   <span className="fw-bold text-primary fs-14">
