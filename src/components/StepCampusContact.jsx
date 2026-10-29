@@ -224,7 +224,7 @@ export default function StepCampusContact({
   return (
     <div className="card border-0 shadow-sm rounded-4 p-4 p-md-5">
       <div className="d-flex align-items-center gap-3 mb-4 pb-3 border-bottom">
-        <div className="p-2.5 bg-primary-subtle text-primary rounded-3">
+        <div className="p-3 bg-primary-subtle text-primary rounded-3">
           <Building2 size={26} />
         </div>
         <div>
@@ -450,7 +450,7 @@ export default function StepCampusContact({
       <div className="d-flex justify-content-between pt-4 border-top mt-4">
         <button
           type="button"
-          className="btn btn-outline-secondary px-4 py-2.5 fw-semibold d-flex align-items-center gap-2"
+          className="btn btn-outline-secondary px-4 py-2 fw-semibold d-flex align-items-center gap-2"
           onClick={onBack}
         >
           <ArrowLeft size={16} />
@@ -459,7 +459,7 @@ export default function StepCampusContact({
 
         <button
           type="button"
-          className="btn btn-primary px-4 py-2.5 fw-semibold d-flex align-items-center gap-2"
+          className="btn btn-primary px-4 py-2 fw-semibold d-flex align-items-center gap-2"
           onClick={handleValidateAndNext}
           disabled={checkingAvailability}
         >

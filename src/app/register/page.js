@@ -22,15 +22,18 @@ const STEPS = [
   { title: 'Review & Activate' },
 ];
 
+const DRAFT_STORAGE_KEY = 'growvidya_onboarding_draft';
+
 function RegisterContent() {
   const searchParams = useSearchParams();
   const planIdParam = searchParams.get('plan_id') || searchParams.get('planId') || searchParams.get('plan');
   const cycleParam = searchParams.get('cycle') || searchParams.get('billing_cycle') || '';
-
   const trialParam = searchParams.get('trial') === '1' || searchParams.get('trial') === 'true';
+  const resumeParam = searchParams.get('resume') || '';
 
   const [currentStep, setCurrentStep] = useState(0);
   const [loading, setLoading] = useState(true);
+  const [draftHydrated, setDraftHydrated] = useState(false);
   const [plans, setPlans] = useState([]);
   const [selectedPlan, setSelectedPlan] = useState(null);
   const [billingCycle, setBillingCycle] = useState(cycleParam);
@@ -49,6 +52,7 @@ function RegisterContent() {
   const [selectedMachines, setSelectedMachines] = useState({});
   const [selectedCards, setSelectedCards] = useState({});
   const [selectedNotifications, setSelectedNotifications] = useState({});
+  const [shippingAddress, setShippingAddress] = useState('');
 
   // Coupon state shared between Step 0 (Plan) and Review
   const [couponCode, setCouponCode] = useState('');
@@ -82,7 +86,7 @@ function RegisterContent() {
     footer: '',
   });
 
-  // Section 4: Academic Year Data (No fallback or prefilled dummy dates)
+  // Section 4: Academic Year Data
   const [academicYearData, setAcademicYearData] = useState({
     academic_year: '',
     start_date: '',
@@ -103,10 +107,44 @@ function RegisterContent() {
   });
 
   useEffect(() => {
-    fetchPlans();
+    initializeWizard();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  const fetchPlans = async () => {
+  const initializeWizard = async () => {
+    let savedDraft = null;
+    if (typeof window !== 'undefined') {
+      try {
+        const raw = sessionStorage.getItem(DRAFT_STORAGE_KEY);
+        if (raw) savedDraft = JSON.parse(raw);
+      } catch (e) {
+        console.warn('Could not read onboarding draft from sessionStorage:', e);
+      }
+    }
+
+    if (savedDraft) {
+      if (savedDraft.schoolProfileData) setSchoolProfileData((prev) => ({ ...prev, ...savedDraft.schoolProfileData }));
+      if (savedDraft.campusContactData) setCampusContactData((prev) => ({ ...prev, ...savedDraft.campusContactData }));
+      if (savedDraft.academicYearData) setAcademicYearData((prev) => ({ ...prev, ...savedDraft.academicYearData }));
+      if (savedDraft.adminData) setAdminData((prev) => ({ ...prev, ...savedDraft.adminData }));
+      if (savedDraft.selectedStorageId !== undefined) setSelectedStorageId(savedDraft.selectedStorageId);
+      if (savedDraft.selectedMachines) setSelectedMachines(savedDraft.selectedMachines);
+      if (savedDraft.selectedCards) setSelectedCards(savedDraft.selectedCards);
+      if (savedDraft.selectedNotifications) setSelectedNotifications(savedDraft.selectedNotifications);
+      if (savedDraft.shippingAddress) setShippingAddress(savedDraft.shippingAddress);
+      if (savedDraft.couponCode) setCouponCode(savedDraft.couponCode);
+      if (savedDraft.appliedCoupon) setAppliedCoupon(savedDraft.appliedCoupon);
+      if (savedDraft.isTrialMode !== undefined && !planIdParam) setIsTrialMode(Boolean(savedDraft.isTrialMode));
+
+      if (resumeParam === 'review') {
+        setCurrentStep(5);
+      } else if (resumeParam === 'plan') {
+        setCurrentStep(0);
+      } else if (typeof savedDraft.currentStep === 'number' && !planIdParam) {
+        setCurrentStep(Math.min(5, Math.max(0, savedDraft.currentStep)));
+      }
+    }
+
     try {
       setLoading(true);
       setCatalogLoading(true);
@@ -125,39 +163,114 @@ function RegisterContent() {
         setCatalog(catalogRes.data);
       }
 
-      // Pre-select plan matching query params
+      // 1. Explicit URL plan_id parameter takes priority
       if (planIdParam) {
         const found = allPlans.find((p) => String(p.id) === String(planIdParam));
         if (found) {
           setSelectedPlan(found);
           setBillingCycle(found.billing_cycle || cycleParam);
-          if (trialParam || found.billing_cycle === 'trial' || parseFloat(found.price) === 0) {
-            setIsTrialMode(true);
+          setIsTrialMode(Boolean(trialParam || found.billing_cycle === 'trial' || parseFloat(found.price) === 0));
+          return;
+        }
+      }
+
+      // 2. Restore plan from saved draft if present
+      if (savedDraft?.selectedPlanId) {
+        const draftPlan = allPlans.find((p) => Number(p.id) === Number(savedDraft.selectedPlanId));
+        if (draftPlan) {
+          setSelectedPlan(draftPlan);
+          setBillingCycle(savedDraft.billingCycle || draftPlan.billing_cycle || '');
+          if (savedDraft.isTrialMode !== undefined) {
+            setIsTrialMode(Boolean(savedDraft.isTrialMode));
           } else {
-            setIsTrialMode(false);
+            setIsTrialMode(draftPlan.billing_cycle === 'trial' || parseFloat(draftPlan.price) === 0);
           }
           return;
         }
       }
 
-      // Default to trial plan if available, or first plan
+      // 3. Default to popular paid plan, or trial plan, or first active plan from DB
+      const matchingCyclePlans = cycleParam
+        ? allPlans.filter((p) => String(p.billing_cycle || '').toLowerCase() === cycleParam.toLowerCase())
+        : [];
       const defaultTrial = allPlans.find((p) => p.billing_cycle === 'trial' || parseFloat(p.price) === 0);
-      const chosen = defaultTrial || allPlans[0] || null;
+      const popularPaid = allPlans.find(
+        (p) => p.billing_cycle !== 'trial' && parseFloat(p.price) > 0 && Number(p.is_popular) === 1
+      );
+
+      let chosen = null;
+      if (trialParam && defaultTrial) {
+        chosen = defaultTrial;
+      } else if (matchingCyclePlans.length > 0) {
+        chosen = matchingCyclePlans.find((p) => Number(p.is_popular) === 1) || matchingCyclePlans[0];
+      } else {
+        chosen = popularPaid || defaultTrial || allPlans[0] || null;
+      }
+
       setSelectedPlan(chosen);
       if (chosen) {
-        if (trialParam || chosen.billing_cycle === 'trial' || parseFloat(chosen.price) === 0) {
-          setIsTrialMode(true);
-        } else {
-          setIsTrialMode(false);
-        }
+        setBillingCycle(chosen.billing_cycle || '');
+        setIsTrialMode(Boolean(trialParam || chosen.billing_cycle === 'trial' || parseFloat(chosen.price) === 0));
       }
     } catch (err) {
       console.error('Failed to load plans:', err);
     } finally {
       setLoading(false);
       setCatalogLoading(false);
+      setDraftHydrated(true);
     }
   };
+
+  // Persist draft state in sessionStorage so Retry Payment from /payment/failed restores 100% of fields
+  useEffect(() => {
+    if (!draftHydrated || typeof window === 'undefined') return;
+    try {
+      const snapshot = {
+        currentStep,
+        selectedPlanId: selectedPlan?.id || null,
+        billingCycle,
+        isTrialMode,
+        selectedStorageId,
+        selectedMachines,
+        selectedCards,
+        selectedNotifications,
+        shippingAddress,
+        couponCode,
+        appliedCoupon,
+        schoolProfileData,
+        campusContactData,
+        academicYearData,
+        adminData,
+      };
+      sessionStorage.setItem(DRAFT_STORAGE_KEY, JSON.stringify(snapshot));
+    } catch (e) {
+      console.warn('Could not persist onboarding draft:', e);
+    }
+  }, [
+    draftHydrated,
+    currentStep,
+    selectedPlan?.id,
+    billingCycle,
+    isTrialMode,
+    selectedStorageId,
+    selectedMachines,
+    selectedCards,
+    selectedNotifications,
+    shippingAddress,
+    couponCode,
+    appliedCoupon,
+    schoolProfileData,
+    campusContactData,
+    academicYearData,
+    adminData,
+  ]);
+
+  // Keep shipping address synced with campus address until explicitly customized
+  useEffect(() => {
+    if (!shippingAddress && campusContactData.address) {
+      setShippingAddress(campusContactData.address);
+    }
+  }, [campusContactData.address, shippingAddress]);
 
   if (loading) {
     return (
@@ -182,6 +295,7 @@ function RegisterContent() {
           billingCycle={billingCycle}
           setBillingCycle={setBillingCycle}
           isTrialMode={isTrialMode}
+          setIsTrialMode={setIsTrialMode}
           catalog={catalog}
           catalogLoading={catalogLoading}
           selectedStorageId={selectedStorageId}
@@ -246,6 +360,8 @@ function RegisterContent() {
           selectedMachines={selectedMachines}
           selectedCards={selectedCards}
           selectedNotifications={selectedNotifications}
+          shippingAddress={shippingAddress}
+          setShippingAddress={setShippingAddress}
           schoolProfileData={schoolProfileData}
           campusContactData={campusContactData}
           academicYearData={academicYearData}
@@ -257,6 +373,7 @@ function RegisterContent() {
           appliedCoupon={appliedCoupon}
           setAppliedCoupon={setAppliedCoupon}
           onBack={() => setCurrentStep(4)}
+          onEditPlan={() => setCurrentStep(0)}
         />
       )}
     </div>
@@ -279,7 +396,7 @@ export default function RegisterPage() {
           <RegisterContent />
         </Suspense>
       </main>
-      <footer className="bg-white border-top py-3 text-center text-muted fs-13 mt-auto">
+      <footer className="bg-white border-top py-3 text-center text-muted fs-13 mt-auto no-print">
         <div className="container">
           Copyright &copy; {new Date().getFullYear()} Growvidya School Management Platform. All rights reserved.
         </div>

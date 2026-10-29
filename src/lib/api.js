@@ -1,6 +1,6 @@
 import axios from 'axios';
 
-const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:5001/api';
+const API_BASE = (process.env.NEXT_PUBLIC_API_BASE_URL || '').replace(/\/+$/, '');
 
 const apiClient = axios.create({
   baseURL: API_BASE,
@@ -21,13 +21,13 @@ export const saasApi = {
     return res.data;
   },
 
-  checkTrialEligibility: async (params) => {
-    const res = await apiClient.get('/saas/trial-eligibility', { params });
+  checkTrialEligibility: async (payload) => {
+    const res = await apiClient.post('/saas/check-trial-eligibility', payload);
     return res.data;
   },
 
-  checkAvailability: async (data) => {
-    const res = await apiClient.post('/saas/check-availability', data);
+  checkAvailability: async (payload) => {
+    const res = await apiClient.post('/saas/check-availability', payload);
     return res.data;
   },
 
@@ -51,18 +51,39 @@ export const saasApi = {
     return res.data;
   },
 
-  createOrder: async (data) => {
-    const res = await apiClient.post('/saas/create-order', data);
+  createOrder: async (payload) => {
+    const res = await apiClient.post('/saas/create-order', payload);
     return res.data;
   },
 
-  validateCoupon: async (code, amount) => {
-    const res = await apiClient.post('/saas/validate-coupon', { code, amount });
+  validateCoupon: async (codeOrPayload, amount, options = {}) => {
+    const body =
+      typeof codeOrPayload === 'object' && codeOrPayload !== null
+        ? codeOrPayload
+        : {
+            code: codeOrPayload,
+            amount,
+            ...(options.planAmount !== undefined ? { plan_amount: options.planAmount } : {}),
+            ...(options.storageAmount !== undefined ? { storage_amount: options.storageAmount } : {}),
+            ...(options.email ? { email: options.email } : {}),
+            ...(options.phone ? { phone: options.phone } : {}),
+          };
+    const res = await apiClient.post('/saas/validate-coupon', body);
     return res.data;
   },
 
   registerSchool: async (payload) => {
-    const res = await apiClient.post('/saas/register', payload);
+    const res = await apiClient.post('/saas/register-school', payload);
+    return res.data;
+  },
+
+  recordPaymentFailure: async (payload) => {
+    const res = await apiClient.post('/saas/record-payment-failure', payload);
+    return res.data;
+  },
+
+  getOrderDetails: async (orderNo) => {
+    const res = await apiClient.get(`/saas/orders/${encodeURIComponent(orderNo)}`);
     return res.data;
   },
 };
