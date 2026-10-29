@@ -566,8 +566,10 @@ export default function StepPlan({
                           <div className="fs-12 text-muted">
                             {Number(trialPlan.max_students) > 0
                               ? `Up to ${Number(trialPlan.max_students).toLocaleString('en-IN')} Students`
-                              : 'Unlimited Students'}{' '}
-                            • {Math.max(0, parseInt(trialPlan.included_storage_gb, 10) || 0)} GB Storage
+                              : 'Unlimited Students'}
+                            {Math.max(0, parseInt(trialPlan.included_storage_gb, 10) || 0) > 0
+                              ? ` • ${Math.max(0, parseInt(trialPlan.included_storage_gb, 10) || 0)} GB Storage`
+                              : ''}
                           </div>
                         </div>
                         <button
@@ -634,8 +636,10 @@ export default function StepPlan({
                             <div className="fs-12 text-muted">
                               {Number(p.max_students) > 0
                                 ? `Up to ${Number(p.max_students).toLocaleString('en-IN')} Students`
-                                : 'Unlimited Students'}{' '}
-                              • {Math.max(0, parseInt(p.included_storage_gb, 10) || 0)} GB Storage
+                                : 'Unlimited Students'}
+                              {Math.max(0, parseInt(p.included_storage_gb, 10) || 0) > 0
+                                ? ` • ${Math.max(0, parseInt(p.included_storage_gb, 10) || 0)} GB Storage`
+                                : ''}
                             </div>
                           </div>
                           <button
