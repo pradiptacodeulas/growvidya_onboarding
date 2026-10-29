@@ -720,7 +720,7 @@ export default function StepPlan({
 
           {/* Plan Capabilities & Limits (100% Dynamic from DB) */}
           <h6 className="fw-bold text-dark fs-13 text-uppercase mb-3">Included Institutional Capacity:</h6>
-          <div className="row g-3 mb-4">
+          <div className={`row g-3 ${planItems.length > 0 ? 'mb-4' : ''}`}>
             <div className="col-sm-6 col-lg-3">
               <div className="p-3 bg-light rounded-3 border h-100">
                 <div className="d-flex align-items-center gap-2 mb-1">
@@ -793,53 +793,41 @@ export default function StepPlan({
           </div>
 
           {/* Plan Features */}
-          <div>
-            <div className="d-flex align-items-center justify-content-between mb-3">
-              <h6 className="fw-bold text-dark fs-13 text-uppercase mb-0 d-flex align-items-center gap-2">
-                <Sparkles size={16} className="text-primary" />
-                <span>Included Platform Features:</span>
-              </h6>
-            </div>
-
-            <div className="row g-3">
-              <div className="col-12 col-md-6">
-                <div className="p-3 rounded-3 bg-light border d-flex align-items-center gap-3 h-100">
-                  <div
-                    className="rounded-circle bg-success-subtle text-success d-flex align-items-center justify-content-center flex-shrink-0"
-                    style={{ width: '28px', height: '28px', minWidth: '28px' }}
-                  >
-                    <Check size={16} strokeWidth={2.5} />
-                  </div>
-                  <span className="fw-semibold text-dark fs-14">
-                    Full School ERP Suite (All Operational Modules Unlocked)
-                  </span>
-                </div>
+          {planItems.length > 0 && (
+            <div>
+              <div className="d-flex align-items-center justify-content-between mb-3">
+                <h6 className="fw-bold text-dark fs-13 text-uppercase mb-0 d-flex align-items-center gap-2">
+                  <Sparkles size={16} className="text-primary" />
+                  <span>Included Platform Features:</span>
+                </h6>
               </div>
 
-              {planItems.map((it) => (
-                <div key={it.id || it.item_code} className="col-12 col-md-6">
-                  <div
-                    className={`p-3 rounded-3 bg-light border d-flex ${
-                      it.description ? 'align-items-start' : 'align-items-center'
-                    } gap-3 h-100`}
-                  >
+              <div className="row g-3">
+                {planItems.map((it) => (
+                  <div key={it.id || it.item_code} className="col-12 col-md-6">
                     <div
-                      className="rounded-circle bg-success-subtle text-success d-flex align-items-center justify-content-center flex-shrink-0"
-                      style={{ width: '28px', height: '28px', minWidth: '28px' }}
+                      className={`p-3 rounded-3 bg-light border d-flex ${
+                        it.description ? 'align-items-start' : 'align-items-center'
+                      } gap-3 h-100`}
                     >
-                      <Check size={16} strokeWidth={2.5} className="text-success" />
-                    </div>
-                    <div className="flex-grow-1 min-w-0">
-                      <span className="fw-semibold text-dark fs-14">{it.item_name}</span>
-                      {it.description && (
-                        <p className="text-muted fs-12 mb-0 mt-1 lh-sm">{it.description}</p>
-                      )}
+                      <div
+                        className="rounded-circle bg-success-subtle text-success d-flex align-items-center justify-content-center flex-shrink-0"
+                        style={{ width: '28px', height: '28px', minWidth: '28px' }}
+                      >
+                        <Check size={16} strokeWidth={2.5} className="text-success" />
+                      </div>
+                      <div className="flex-grow-1 min-w-0">
+                        <span className="fw-semibold text-dark fs-14">{it.item_name}</span>
+                        {it.description && (
+                          <p className="text-muted fs-12 mb-0 mt-1 lh-sm">{it.description}</p>
+                        )}
+                      </div>
                     </div>
                   </div>
-                </div>
-              ))}
+                ))}
+              </div>
             </div>
-          </div>
+          )}
         </div>
 
         {/* ============================================================ */}
