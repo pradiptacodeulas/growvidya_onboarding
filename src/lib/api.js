@@ -72,6 +72,15 @@ export const saasApi = {
     return res.data;
   },
 
+  removeCoupon: async (codeOrPayload) => {
+    const body =
+      typeof codeOrPayload === 'object' && codeOrPayload !== null
+        ? codeOrPayload
+        : { code: codeOrPayload };
+    const res = await apiClient.post('/saas/remove-coupon', body);
+    return res.data;
+  },
+
   registerSchool: async (payload) => {
     const res = await apiClient.post('/saas/register-school', payload);
     return res.data;

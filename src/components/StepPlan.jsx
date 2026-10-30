@@ -566,11 +566,17 @@ export default function StepPlan({
     }
   };
 
-  const handleRemoveCoupon = () => {
+  const handleRemoveCoupon = async () => {
+    const codeToRelease = appliedCoupon?.code || couponCode;
     if (setAppliedCoupon) setAppliedCoupon(null);
     if (setCouponCode) setCouponCode('');
     setCouponError('');
     if (setIsTrialMode) setIsTrialMode(true);
+    if (codeToRelease) {
+      try {
+        await saasApi.removeCoupon({ code: codeToRelease });
+      } catch (_) {}
+    }
   };
 
   // Extract SMS & Push items if listed on plan items
@@ -1539,6 +1545,11 @@ export default function StepPlan({
                 <div className="text-success fs-11 fw-semibold mt-1">
                   ✓ Coupon <strong>{appliedCoupon.code}</strong> applied — You save ₹
                   {discountAmount.toLocaleString('en-IN', { minimumFractionDigits: 2 })}!
+                  {appliedCoupon.max_uses !== null && appliedCoupon.max_uses !== undefined && (
+                    <span className="ms-1 text-muted">
+                      (Used: {appliedCoupon.used_count ?? appliedCoupon.usedCount}/{appliedCoupon.max_uses})
+                    </span>
+                  )}
                 </div>
               )}
             </div>

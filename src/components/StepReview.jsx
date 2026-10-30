@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import {
   Tag,
@@ -226,11 +226,62 @@ export default function StepReview({
     }
   };
 
-  const handleRemoveCoupon = () => {
+  // Re-validate applied coupon against user's entered email/phone & live DB limits on entering Review step
+  useEffect(() => {
+    if (!appliedCoupon?.code) return;
+    let isMounted = true;
+    const verifyAppliedCouponOnReview = async () => {
+      try {
+        const activePlanAmt = isPureFreeOrTrial ? 0 : basePrice;
+        const activeSub = Math.round((activePlanAmt + addonsTotal) * 100) / 100;
+        const res = await saasApi.validateCoupon({
+          code: appliedCoupon.code,
+          amount: activeSub,
+          plan_amount: activePlanAmt,
+          storage_amount: storagePrice,
+          email: adminData?.email || campusContactData?.email || null,
+          phone: adminData?.phone || campusContactData?.phone_number || null,
+          check_only: true,
+        });
+        if (isMounted && res?.data && setAppliedCoupon) {
+          setAppliedCoupon(res.data);
+        }
+      } catch (err) {
+        if (isMounted) {
+          const codeToRelease = appliedCoupon.code;
+          if (setAppliedCoupon) setAppliedCoupon(null);
+          setCouponError(
+            err.response?.data?.message || 'This coupon is no longer valid or has reached its usage limit.'
+          );
+          try {
+            await saasApi.removeCoupon({ code: codeToRelease });
+          } catch (_) {}
+        }
+      }
+    };
+    verifyAppliedCouponOnReview();
+    return () => {
+      isMounted = false;
+    };
+  }, [
+    appliedCoupon?.code,
+    adminData?.email,
+    adminData?.phone,
+    campusContactData?.email,
+    campusContactData?.phone_number,
+  ]);
+
+  const handleRemoveCoupon = async () => {
+    const codeToRelease = appliedCoupon?.code || couponCode;
     if (setAppliedCoupon) setAppliedCoupon(null);
     if (setCouponCode) setCouponCode('');
     setCouponError('');
     if (setIsTrialMode && hasTrialOption) setIsTrialMode(true);
+    if (codeToRelease) {
+      try {
+        await saasApi.removeCoupon({ code: codeToRelease });
+      } catch (_) {}
+    }
   };
 
   const buildRegistrationPayload = (orderData, paymentProof = {}, isTrialAction = false) => {
@@ -862,6 +913,11 @@ export default function StepReview({
                             ? 'Applies to Software & Storage'
                             : 'Applies to Base Plan'}
                         ) — You save ₹{Number(displayDiscount).toLocaleString('en-IN', { minimumFractionDigits: 2 })}.
+                        {appliedCoupon.max_uses !== null && appliedCoupon.max_uses !== undefined && (
+                          <span className="ms-1 text-muted">
+                            (Used: {appliedCoupon.used_count ?? appliedCoupon.usedCount}/{appliedCoupon.max_uses})
+                          </span>
+                        )}
                       </div>
                     )}
                   </div>
