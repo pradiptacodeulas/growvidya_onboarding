@@ -971,7 +971,7 @@ export default function StepReview({
             <>
               <button
                 type="button"
-                className="btn btn-primary px-4 py-2 fw-semibold fs-14 shadow-sm"
+                className="btn btn-outline-primary px-4 py-2 fw-semibold fs-14 shadow-sm"
                 onClick={() => executeOnboardingCheckout(false)}
                 disabled={submitting}
               >
@@ -989,7 +989,7 @@ export default function StepReview({
 
               <button
                 type="button"
-                className="btn btn-outline-success px-4 py-2 fw-semibold fs-14"
+                className="btn btn-success px-4 py-2 fw-semibold fs-14"
                 onClick={() => executeOnboardingCheckout(true)}
                 disabled={submitting}
               >
