@@ -66,7 +66,7 @@ export default function StepReview({
   const rfidCards = catalog?.rfid_cards || [];
   const notificationRecords = catalog?.notification_records || [];
 
-  const effectiveStorageCycle = isPureFreeOrTrial || isTrialMode ? 'annual' : cycle || 'annual';
+  const effectiveStorageCycle = isPureFreeOrTrial ? 'annual' : cycle || 'annual';
   const selectedStorage =
     storagePlans.find((s) => Number(s.id) === Number(selectedStorageId)) || null;
   const storagePrice = selectedStorage
@@ -177,9 +177,9 @@ export default function StepReview({
   const trialDiscountAmount = computeScopedDiscount(0);
   const trialPayable = Math.max(0, Math.round((addonsTotal - trialDiscountAmount) * 100) / 100);
 
-  const displaySubtotal = isPureFreeOrTrial || isTrialMode ? addonsTotal : paidSubtotal;
-  const displayDiscount = isPureFreeOrTrial || isTrialMode ? trialDiscountAmount : paidDiscountAmount;
-  const displayFinalAmount = isPureFreeOrTrial || isTrialMode ? trialPayable : finalPaidAmount;
+  const displaySubtotal = isPureFreeOrTrial ? addonsTotal : paidSubtotal;
+  const displayDiscount = isPureFreeOrTrial ? trialDiscountAmount : paidDiscountAmount;
+  const displayFinalAmount = isPureFreeOrTrial ? trialPayable : finalPaidAmount;
 
   const handleApplyCoupon = async () => {
     if (!couponCode.trim()) return;
@@ -843,10 +843,10 @@ export default function StepReview({
                 <div className="d-flex justify-content-between text-dark">
                   <span>
                     Base Platform License ({selectedPlan?.plan_name}
-                    {isPureFreeOrTrial || isTrialMode ? ' — Free Trial' : ` — ${cycleMeta.label}`}):
+                    {isPureFreeOrTrial ? ' — Free Trial' : ` — ${cycleMeta.label}`}):
                   </span>
                   <span className="fw-semibold">
-                    {isPureFreeOrTrial || isTrialMode || basePrice <= 0
+                    {isPureFreeOrTrial || basePrice <= 0
                       ? '₹0.00'
                       : `₹${Number(basePrice).toLocaleString('en-IN', { minimumFractionDigits: 2 })}`}
                   </span>

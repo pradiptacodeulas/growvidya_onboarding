@@ -28,7 +28,8 @@ function RegisterContent() {
   const searchParams = useSearchParams();
   const planIdParam = searchParams.get('plan_id') || searchParams.get('planId') || searchParams.get('plan');
   const cycleParam = searchParams.get('cycle') || searchParams.get('billing_cycle') || '';
-  const trialParam = searchParams.get('trial') === '1' || searchParams.get('trial') === 'true';
+  const trialRawParam = searchParams.get('trial');
+  const trialParam = trialRawParam === '1' || trialRawParam === 'true';
   const resumeParam = searchParams.get('resume') || '';
 
   const [currentStep, setCurrentStep] = useState(0);
@@ -109,7 +110,7 @@ function RegisterContent() {
   useEffect(() => {
     initializeWizard();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [planIdParam, cycleParam, trialRawParam]);
 
   const initializeWizard = async () => {
     let savedDraft = null;
@@ -165,11 +166,30 @@ function RegisterContent() {
 
       // 1. Explicit URL plan_id parameter takes priority
       if (planIdParam) {
-        const found = allPlans.find((p) => String(p.id) === String(planIdParam));
+        let found = allPlans.find((p) => String(p.id) === String(planIdParam));
+        if (found && cycleParam && cycleParam.toLowerCase() !== 'trial') {
+          const foundCycle = String(found.billing_cycle || '').toLowerCase();
+          const targetCycle = cycleParam.toLowerCase();
+          if (foundCycle !== targetCycle) {
+            const cycleMatch = allPlans.find(
+              (p) =>
+                String(p.billing_cycle || '').toLowerCase() === targetCycle &&
+                ((found.plan_group && p.plan_group === found.plan_group) ||
+                  String(p.plan_name || '').toLowerCase() === String(found.plan_name || '').toLowerCase())
+            );
+            if (cycleMatch) {
+              found = cycleMatch;
+            }
+          }
+        }
         if (found) {
           setSelectedPlan(found);
           setBillingCycle(found.billing_cycle || cycleParam);
-          setIsTrialMode(Boolean(trialParam || found.billing_cycle === 'trial' || parseFloat(found.price) === 0));
+          setIsTrialMode(
+            trialRawParam !== null
+              ? Boolean(trialParam)
+              : Boolean(found.billing_cycle === 'trial' || parseFloat(found.price) === 0)
+          );
           return;
         }
       }

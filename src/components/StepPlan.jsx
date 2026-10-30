@@ -126,8 +126,21 @@ export default function StepPlan({
     if (setBillingCycle && planCycle) {
       setBillingCycle(planCycle);
     }
+    const trialFlag = Boolean(
+      activateAsTrial ||
+        planCycle === 'trial' ||
+        parseFloat(plan.price) <= 0 ||
+        parseInt(plan.free_trial_days, 10) > 0
+    );
     if (setIsTrialMode) {
-      setIsTrialMode(Boolean(activateAsTrial || planCycle === 'trial' || parseFloat(plan.price) <= 0));
+      setIsTrialMode(trialFlag);
+    }
+    if (typeof window !== 'undefined') {
+      const url = new URL(window.location.href);
+      url.searchParams.set('plan_id', String(plan.id));
+      if (planCycle) url.searchParams.set('cycle', planCycle);
+      url.searchParams.set('trial', trialFlag ? '1' : '0');
+      window.history.replaceState({}, '', url.toString());
     }
     setShowPlanSwitcher(false);
   };
@@ -459,7 +472,7 @@ export default function StepPlan({
 
   const addonsTotal =
     Math.round((storagePrice + machinesTotal + cardsTotal + notificationsTotal) * 100) / 100;
-  const effectiveBasePrice = isTrialMode || isPureTrialPlan ? 0 : basePrice;
+  const effectiveBasePrice = isPureTrialPlan ? 0 : basePrice;
   const grandTotal = Math.round((effectiveBasePrice + addonsTotal) * 100) / 100;
 
   // Extract SMS & Push items if listed on plan items
@@ -1248,7 +1261,7 @@ export default function StepPlan({
                 </div>
               </div>
               <div className="text-end flex-shrink-0">
-                {isTrialMode || isPureTrialPlan ? (
+                {isPureTrialPlan ? (
                   <div>
                     <span className="fw-bold text-success fs-14">₹0.00</span>
                     <div className="badge bg-success-subtle text-success fs-10 px-2 py-1 d-block mt-1">
@@ -1256,9 +1269,16 @@ export default function StepPlan({
                     </div>
                   </div>
                 ) : (
-                  <span className="fw-bold text-dark fs-14">
-                    ₹{basePrice.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
-                  </span>
+                  <div>
+                    <span className="fw-bold text-dark fs-14">
+                      ₹{basePrice.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                    </span>
+                    {isTrialMode && (
+                      <div className="badge bg-success-subtle text-success fs-10 px-2 py-1 d-block mt-1">
+                        Free Trial
+                      </div>
+                    )}
+                  </div>
                 )}
               </div>
             </div>
