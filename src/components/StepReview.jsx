@@ -143,7 +143,9 @@ export default function StepReview({
   // Compute scoped coupon discount dynamically for Paid vs Trial mode
   const computeScopedDiscount = (planAmt) => {
     if (!appliedCoupon) return 0;
-    const scope = String(appliedCoupon.applicable_scope || 'plan_only').toLowerCase();
+    const scope = String(
+      appliedCoupon.applicable_scope || appliedCoupon.applicableScope || 'plan_only'
+    ).toLowerCase();
     const eligibleSubtotal =
       scope === 'all'
         ? planAmt + addonsTotal
@@ -152,19 +154,32 @@ export default function StepReview({
         : planAmt;
 
     if (eligibleSubtotal <= 0) return 0;
-    const minOrder = parseFloat(appliedCoupon.min_order_amount || 0);
+    const minOrder = parseFloat(
+      appliedCoupon.min_order_amount ?? appliedCoupon.minOrderAmount ?? 0
+    );
     if (minOrder > 0 && eligibleSubtotal < minOrder) return 0;
 
     let disc = 0;
-    const dVal = parseFloat(appliedCoupon.discount_value || 0);
-    if (String(appliedCoupon.discount_type || '').toLowerCase() === 'percentage' && dVal > 0) {
+    const dVal = parseFloat(appliedCoupon.discount_value ?? appliedCoupon.discountValue ?? 0);
+    const dType = String(
+      appliedCoupon.discount_type || appliedCoupon.discountType || ''
+    ).toLowerCase();
+    if (dType === 'percentage' && dVal > 0) {
       disc = (eligibleSubtotal * dVal) / 100;
-      const maxD = parseFloat(appliedCoupon.max_discount || 0);
+      const maxD = parseFloat(
+        appliedCoupon.max_discount ??
+          appliedCoupon.max_discount_amount ??
+          appliedCoupon.maxDiscountAmount ??
+          0
+      );
       if (maxD > 0 && disc > maxD) disc = maxD;
     } else if (dVal > 0) {
       disc = dVal;
-    } else if (appliedCoupon.discountAmount !== undefined) {
-      disc = parseFloat(appliedCoupon.discountAmount || 0);
+    } else if (
+      appliedCoupon.discountAmount !== undefined ||
+      appliedCoupon.discount_amount !== undefined
+    ) {
+      disc = parseFloat(appliedCoupon.discountAmount ?? appliedCoupon.discount_amount ?? 0);
     }
 
     return Math.min(eligibleSubtotal, Math.round(disc * 100) / 100);
@@ -186,7 +201,7 @@ export default function StepReview({
     try {
       setValidatingCoupon(true);
       setCouponError('');
-      const activePlanAmt = isPureFreeOrTrial || isTrialMode ? 0 : basePrice;
+      const activePlanAmt = isPureFreeOrTrial ? 0 : basePrice;
       const activeSub = Math.round((activePlanAmt + addonsTotal) * 100) / 100;
 
       const res = await saasApi.validateCoupon({
@@ -200,6 +215,7 @@ export default function StepReview({
 
       if (res?.data) {
         if (setAppliedCoupon) setAppliedCoupon(res.data);
+        if (setIsTrialMode) setIsTrialMode(false);
       } else {
         setCouponError(res?.message || 'Invalid coupon code.');
       }
@@ -214,6 +230,7 @@ export default function StepReview({
     if (setAppliedCoupon) setAppliedCoupon(null);
     if (setCouponCode) setCouponCode('');
     setCouponError('');
+    if (setIsTrialMode && hasTrialOption) setIsTrialMode(true);
   };
 
   const buildRegistrationPayload = (orderData, paymentProof = {}, isTrialAction = false) => {
@@ -638,11 +655,6 @@ export default function StepReview({
               <div>
                 <strong>Pincode:</strong> {campusContactData.postal_code || '—'}
               </div>
-              {campusContactData.footer && (
-                <div className="text-muted fs-12 mt-1 border-top pt-1 text-truncate">
-                  <strong>Footer:</strong> {campusContactData.footer}
-                </div>
-              )}
             </div>
           </div>
         </div>
@@ -820,9 +832,9 @@ export default function StepReview({
                     {appliedCoupon && (
                       <div className="text-success fs-12 fw-semibold mt-1">
                         ✓ Coupon <strong>{appliedCoupon.code}</strong> applied (
-                        {appliedCoupon.applicable_scope === 'all'
+                        {(appliedCoupon.applicable_scope || appliedCoupon.applicableScope) === 'all'
                           ? 'Applies to Full Order'
-                          : appliedCoupon.applicable_scope === 'software_and_storage'
+                          : (appliedCoupon.applicable_scope || appliedCoupon.applicableScope) === 'software_and_storage'
                           ? 'Applies to Software & Storage'
                           : 'Applies to Base Plan'}
                         ) — You save ₹{Number(displayDiscount).toLocaleString('en-IN', { minimumFractionDigits: 2 })}.
@@ -955,7 +967,7 @@ export default function StepReview({
         </button>
 
         <div className="d-flex flex-wrap align-items-center gap-3 ms-auto">
-          {hasTrialOption ? (
+          {hasTrialOption && !appliedCoupon ? (
             <>
               <button
                 type="button"

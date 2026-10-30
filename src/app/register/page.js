@@ -29,7 +29,8 @@ function RegisterContent() {
   const planIdParam = searchParams.get('plan_id') || searchParams.get('planId') || searchParams.get('plan');
   const cycleParam = searchParams.get('cycle') || searchParams.get('billing_cycle') || '';
   const trialRawParam = searchParams.get('trial');
-  const trialParam = trialRawParam === '1' || trialRawParam === 'true';
+  // All packages are available with a Free Trial by default for first-time users unless trial=0/false is explicitly passed
+  const trialParam = trialRawParam === null ? true : trialRawParam === '1' || trialRawParam === 'true';
   const resumeParam = searchParams.get('resume') || '';
 
   const [currentStep, setCurrentStep] = useState(0);
@@ -186,9 +187,11 @@ function RegisterContent() {
           setSelectedPlan(found);
           setBillingCycle(found.billing_cycle || cycleParam);
           setIsTrialMode(
-            trialRawParam !== null
+            savedDraft?.appliedCoupon
+              ? false
+              : trialRawParam !== null
               ? Boolean(trialParam)
-              : Boolean(found.billing_cycle === 'trial' || parseFloat(found.price) === 0)
+              : true
           );
           return;
         }
@@ -200,10 +203,12 @@ function RegisterContent() {
         if (draftPlan) {
           setSelectedPlan(draftPlan);
           setBillingCycle(savedDraft.billingCycle || draftPlan.billing_cycle || '');
-          if (savedDraft.isTrialMode !== undefined) {
+          if (savedDraft.appliedCoupon) {
+            setIsTrialMode(false);
+          } else if (savedDraft.isTrialMode !== undefined) {
             setIsTrialMode(Boolean(savedDraft.isTrialMode));
           } else {
-            setIsTrialMode(draftPlan.billing_cycle === 'trial' || parseFloat(draftPlan.price) === 0);
+            setIsTrialMode(true);
           }
           return;
         }
@@ -219,9 +224,7 @@ function RegisterContent() {
       );
 
       let chosen = null;
-      if (trialParam && defaultTrial) {
-        chosen = defaultTrial;
-      } else if (matchingCyclePlans.length > 0) {
+      if (matchingCyclePlans.length > 0) {
         chosen = matchingCyclePlans.find((p) => Number(p.is_popular) === 1) || matchingCyclePlans[0];
       } else {
         chosen = popularPaid || defaultTrial || allPlans[0] || null;
@@ -230,7 +233,7 @@ function RegisterContent() {
       setSelectedPlan(chosen);
       if (chosen) {
         setBillingCycle(chosen.billing_cycle || '');
-        setIsTrialMode(Boolean(trialParam || chosen.billing_cycle === 'trial' || parseFloat(chosen.price) === 0));
+        setIsTrialMode(savedDraft?.appliedCoupon ? false : Boolean(trialParam));
       }
     } catch (err) {
       console.error('Failed to load plans:', err);
@@ -326,6 +329,10 @@ function RegisterContent() {
           setSelectedCards={setSelectedCards}
           selectedNotifications={selectedNotifications}
           setSelectedNotifications={setSelectedNotifications}
+          couponCode={couponCode}
+          setCouponCode={setCouponCode}
+          appliedCoupon={appliedCoupon}
+          setAppliedCoupon={setAppliedCoupon}
           onNext={() => setCurrentStep(1)}
         />
       )}

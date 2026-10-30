@@ -21,7 +21,10 @@ import {
   ChevronDown,
   ChevronUp,
   Layers,
+  Tag,
+  Loader2,
 } from 'lucide-react';
+import saasApi from '../lib/api';
 
 const API_BASE = (process.env.NEXT_PUBLIC_API_BASE_URL || '').replace(/\/+$/, '');
 const SERVER_BASE = API_BASE.replace(/\/api\/?$/, '');
@@ -58,9 +61,15 @@ export default function StepPlan({
   setSelectedCards,
   selectedNotifications = {},
   setSelectedNotifications,
+  couponCode = '',
+  setCouponCode,
+  appliedCoupon = null,
+  setAppliedCoupon,
   onNext,
 }) {
   const [showPlanSwitcher, setShowPlanSwitcher] = useState(false);
+  const [couponError, setCouponError] = useState('');
+  const [validatingCoupon, setValidatingCoupon] = useState(false);
   const [collapsedSections, setCollapsedSections] = useState({
     storage: false,
     machines: false,
@@ -119,19 +128,21 @@ export default function StepPlan({
       );
   }, [plans, activePaidCycle]);
 
-  const handleChoosePlan = (plan, activateAsTrial = false) => {
+  const handleChoosePlan = (plan, activateAsTrial = true) => {
     if (!plan) return;
     if (setSelectedPlan) setSelectedPlan(plan);
     const planCycle = String(plan.billing_cycle || '').toLowerCase();
     if (setBillingCycle && planCycle) {
       setBillingCycle(planCycle);
     }
-    const trialFlag = Boolean(
-      activateAsTrial ||
-        planCycle === 'trial' ||
-        parseFloat(plan.price) <= 0 ||
-        parseInt(plan.free_trial_days, 10) > 0
-    );
+    const trialFlag = appliedCoupon
+      ? false
+      : Boolean(
+          activateAsTrial ||
+            planCycle === 'trial' ||
+            parseFloat(plan.price) <= 0 ||
+            parseInt(plan.free_trial_days, 10) > 0
+        );
     if (setIsTrialMode) {
       setIsTrialMode(trialFlag);
     }
@@ -473,7 +484,100 @@ export default function StepPlan({
   const addonsTotal =
     Math.round((storagePrice + machinesTotal + cardsTotal + notificationsTotal) * 100) / 100;
   const effectiveBasePrice = isPureTrialPlan ? 0 : basePrice;
-  const grandTotal = Math.round((effectiveBasePrice + addonsTotal) * 100) / 100;
+  const subtotalAmount = Math.round((effectiveBasePrice + addonsTotal) * 100) / 100;
+
+  const computeScopedDiscount = (planAmt) => {
+    if (!appliedCoupon) return 0;
+    const scope = String(
+      appliedCoupon.applicable_scope || appliedCoupon.applicableScope || 'plan_only'
+    ).toLowerCase();
+    const eligibleSubtotal =
+      scope === 'all'
+        ? planAmt + addonsTotal
+        : scope === 'software_and_storage'
+        ? planAmt + storagePrice
+        : planAmt;
+
+    if (eligibleSubtotal <= 0) return 0;
+    const minOrder = parseFloat(
+      appliedCoupon.min_order_amount ?? appliedCoupon.minOrderAmount ?? 0
+    );
+    if (minOrder > 0 && eligibleSubtotal < minOrder) return 0;
+
+    let disc = 0;
+    const dVal = parseFloat(appliedCoupon.discount_value ?? appliedCoupon.discountValue ?? 0);
+    const dType = String(
+      appliedCoupon.discount_type || appliedCoupon.discountType || ''
+    ).toLowerCase();
+
+    if (dType === 'percentage' && dVal > 0) {
+      disc = (eligibleSubtotal * dVal) / 100;
+      const maxD = parseFloat(
+        appliedCoupon.max_discount ??
+          appliedCoupon.max_discount_amount ??
+          appliedCoupon.maxDiscountAmount ??
+          0
+      );
+      if (maxD > 0 && disc > maxD) disc = maxD;
+    } else if (dVal > 0) {
+      disc = dVal;
+    } else if (
+      appliedCoupon.discountAmount !== undefined ||
+      appliedCoupon.discount_amount !== undefined
+    ) {
+      disc = parseFloat(appliedCoupon.discountAmount ?? appliedCoupon.discount_amount ?? 0);
+    }
+
+    return Math.min(eligibleSubtotal, Math.round(disc * 100) / 100);
+  };
+
+  const discountAmount = computeScopedDiscount(effectiveBasePrice);
+  const grandTotal = Math.max(0, Math.round((subtotalAmount - discountAmount) * 100) / 100);
+
+  const handleApplyCoupon = async () => {
+    if (!couponCode || !couponCode.trim()) return;
+    try {
+      setValidatingCoupon(true);
+      setCouponError('');
+      const activePlanAmt = effectiveBasePrice;
+      const activeSub = Math.round((activePlanAmt + addonsTotal) * 100) / 100;
+
+      const res = await saasApi.validateCoupon({
+        code: couponCode.trim(),
+        amount: activeSub,
+        plan_amount: activePlanAmt,
+        storage_amount: storagePrice,
+      });
+
+      if (res?.data) {
+        if (setAppliedCoupon) setAppliedCoupon(res.data);
+        if (setIsTrialMode) setIsTrialMode(false);
+        if (typeof window !== 'undefined') {
+          const url = new URL(window.location.href);
+          url.searchParams.set('trial', '0');
+          window.history.replaceState({}, '', url.toString());
+        }
+      } else {
+        setCouponError(res?.message || 'Invalid coupon code.');
+      }
+    } catch (err) {
+      setCouponError(err.response?.data?.message || 'Failed to validate coupon.');
+    } finally {
+      setValidatingCoupon(false);
+    }
+  };
+
+  const handleRemoveCoupon = () => {
+    if (setAppliedCoupon) setAppliedCoupon(null);
+    if (setCouponCode) setCouponCode('');
+    setCouponError('');
+    if (setIsTrialMode) setIsTrialMode(true);
+    if (typeof window !== 'undefined') {
+      const url = new URL(window.location.href);
+      url.searchParams.set('trial', '1');
+      window.history.replaceState({}, '', url.toString());
+    }
+  };
 
   // Extract SMS & Push items if listed on plan items
   const smsItem = (selectedPlan.items || []).find(
@@ -1273,7 +1377,7 @@ export default function StepPlan({
                     <span className="fw-bold text-dark fs-14">
                       ₹{basePrice.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
                     </span>
-                    {isTrialMode && (
+                    {isTrialMode && !appliedCoupon && (
                       <div className="badge bg-success-subtle text-success fs-10 px-2 py-1 d-block mt-1">
                         Free Trial
                       </div>
@@ -1397,6 +1501,61 @@ export default function StepPlan({
             )}
           </div>
 
+          {/* Coupon Code Input in Order Summary */}
+          {(effectiveBasePrice > 0 || addonsTotal > 0) && (
+            <div className="mb-3 pt-2 border-top">
+              <label className="form-label fs-12 fw-bold text-dark d-flex align-items-center gap-1 mb-1">
+                <Tag size={13} className="text-primary" />
+                <span>Have a Coupon Code?</span>
+              </label>
+              <div className="input-group input-group-sm">
+                <input
+                  type="text"
+                  className="form-control"
+                  placeholder="Enter coupon code"
+                  value={couponCode}
+                  onChange={(e) => {
+                    if (setCouponCode) setCouponCode(e.target.value.toUpperCase());
+                    if (couponError) setCouponError('');
+                  }}
+                  disabled={Boolean(appliedCoupon)}
+                />
+                {appliedCoupon ? (
+                  <button
+                    type="button"
+                    className="btn btn-outline-danger"
+                    onClick={handleRemoveCoupon}
+                  >
+                    Remove
+                  </button>
+                ) : (
+                  <button
+                    type="button"
+                    className="btn btn-primary"
+                    onClick={handleApplyCoupon}
+                    disabled={validatingCoupon || !couponCode || !couponCode.trim()}
+                  >
+                    {validatingCoupon ? (
+                      <>
+                        <Loader2 size={13} className="animate-spin me-1 inline" />
+                        <span>Checking...</span>
+                      </>
+                    ) : (
+                      'Apply'
+                    )}
+                  </button>
+                )}
+              </div>
+              {couponError && <div className="text-danger fs-11 mt-1">{couponError}</div>}
+              {appliedCoupon && (
+                <div className="text-success fs-11 fw-semibold mt-1">
+                  ✓ Coupon <strong>{appliedCoupon.code}</strong> applied — You save ₹
+                  {discountAmount.toLocaleString('en-IN', { minimumFractionDigits: 2 })}!
+                </div>
+              )}
+            </div>
+          )}
+
           {/* Flat Net Payable Summary (Zero GST) */}
           <div className="p-3 bg-light rounded-3 mb-3">
             <div className="d-flex justify-content-between align-items-center fs-13 mb-2">
@@ -1411,13 +1570,23 @@ export default function StepPlan({
                 ₹{addonsTotal.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
               </span>
             </div>
+            {discountAmount > 0 && (
+              <div className="d-flex justify-content-between align-items-center fs-13 mb-2 text-success fw-semibold">
+                <span>Coupon Discount ({appliedCoupon?.code}):</span>
+                <span>
+                  -₹{discountAmount.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                </span>
+              </div>
+            )}
             <div className="d-flex justify-content-between align-items-center pt-2 border-top">
               <div>
                 <span className="fs-15 fw-bold text-dark">Net Payable Total:</span>
                 <div className="fs-11 text-muted">
-                  {isTrialMode || isPureTrialPlan
+                  {appliedCoupon
+                    ? 'Coupon discount applied • Proceed with discounted payment'
+                    : isTrialMode || isPureTrialPlan
                     ? trialDays > 0
-                      ? `Software free for ${trialDays} days`
+                      ? `Includes ${trialDays}-day free trial option`
                       : 'Free evaluation access'
                     : 'Flat net pricing • No extra charges'}
                 </div>
@@ -1429,7 +1598,7 @@ export default function StepPlan({
           </div>
 
           {/* Free trial notification note */}
-          {(isTrialMode || isPureTrialPlan) && grandTotal === 0 && (
+          {(isTrialMode || isPureTrialPlan) && !appliedCoupon && grandTotal === 0 && (
             <div className="p-3 rounded-3 bg-success-subtle text-success border border-success-subtle fs-12 mb-3 d-flex align-items-center gap-2">
               <ShieldCheck size={16} className="flex-shrink-0" />
               <span>
@@ -1443,10 +1612,14 @@ export default function StepPlan({
           <div className="pt-2">
             <button
               type="button"
-              className="btn btn-success w-100 py-2 fw-semibold d-flex align-items-center justify-content-center gap-2 fs-15 shadow-sm"
+              className={`btn ${appliedCoupon ? 'btn-primary' : 'btn-success'} w-100 py-2 fw-semibold d-flex align-items-center justify-content-center gap-2 fs-15 shadow-sm`}
               onClick={onNext}
             >
-              <span>Continue: {trialDays > 0 ? ` for ${trialDays} days` : '-'} Free Trial</span>
+              <span>
+                {appliedCoupon
+                  ? `Continue with Discounted Price (₹${grandTotal.toLocaleString('en-IN')})`
+                  : `Continue: ${trialDays > 0 ? `for ${trialDays} days ` : ''}Free Trial`}
+              </span>
               <ArrowRight size={16} />
             </button>
           </div>

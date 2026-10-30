@@ -219,8 +219,6 @@ export default function StepCampusContact({
     onNext();
   };
 
-  const defaultFooterPlaceholder = `Copyright © ${new Date().getFullYear()} ${schoolName ? schoolName : 'Your School Name'} - All Rights Reserved`;
-
   return (
     <div className="card border-0 shadow-sm rounded-4 p-4 p-md-5">
       <div className="d-flex align-items-center gap-3 mb-4 pb-3 border-bottom">
@@ -230,7 +228,7 @@ export default function StepCampusContact({
         <div>
           <h4 className="fw-bold text-dark mb-0">Campus &amp; Contact</h4>
           <p className="text-muted fs-13 mb-0">
-            Provide communication channels, campus address, and portal footer notice.
+            Provide communication channels and campus address.
           </p>
         </div>
       </div>
@@ -427,22 +425,6 @@ export default function StepCampusContact({
             />
           </div>
           {errors.postal_code && <div className="text-danger fs-12 mt-1">{errors.postal_code}</div>}
-        </div>
-
-        {/* Footer / Copyright Note */}
-        <div className="col-12 col-md-6">
-          <label className="form-label">Footer / Copyright Note</label>
-          <input
-            type="text"
-            className="form-control"
-            name="footer"
-            value={formData.footer || ''}
-            onChange={handleChange}
-            placeholder={defaultFooterPlaceholder}
-          />
-          <div className="text-muted fs-11 mt-1">
-            Displayed on print receipts, report cards, portal footer, and official documents.
-          </div>
         </div>
       </div>
 
