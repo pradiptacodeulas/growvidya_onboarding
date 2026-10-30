@@ -128,11 +128,9 @@ function OnboardingPaymentSuccessContent() {
   const schoolPhone = order?.school?.phone || '';
   const schoolAddress = order?.school?.address || order?.shipping_address || '';
 
-  const portalLaunchUrl = handoverToken
-    ? `${portalUrl}/auth/callback?token=${encodeURIComponent(handoverToken)}`
-    : `${portalUrl}/account/login/adminlogin?registered=1${
-        adminEmail ? `&email=${encodeURIComponent(adminEmail)}` : ''
-      }`;
+  const portalLaunchUrl = `${portalUrl}/account/login/adminlogin?registered=1${
+    adminEmail ? `&email=${encodeURIComponent(adminEmail)}` : ''
+  }`;
 
   const lineItems =
     Array.isArray(order?.line_items) && order.line_items.length > 0
