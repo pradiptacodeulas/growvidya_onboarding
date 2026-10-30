@@ -507,26 +507,6 @@ export default function StepPlan({
               </div>
 
               <div className="d-flex flex-wrap align-items-center gap-2">
-                {availableCycles.length > 1 && (
-                  <div className="bg-light p-1 rounded-pill border d-inline-flex flex-wrap gap-1">
-                    {availableCycles.map((cyc) => {
-                      const active = !isPureTrialPlan && !isTrialMode && activePaidCycle === cyc.cycle;
-                      return (
-                        <button
-                          key={cyc.cycle}
-                          type="button"
-                          onClick={() => handleSwitchCycleTab(cyc.cycle)}
-                          className={`btn btn-sm rounded-pill px-3 py-1 fw-semibold fs-12 ${
-                            active ? 'btn-primary text-white shadow-sm' : 'btn-light text-secondary border-0'
-                          }`}
-                        >
-                          {cyc.label}
-                        </button>
-                      );
-                    })}
-                  </div>
-                )}
-
                 <button
                   type="button"
                   onClick={() => setShowPlanSwitcher((prev) => !prev)}
@@ -1600,10 +1580,10 @@ export default function StepPlan({
           <div className="pt-2">
             <button
               type="button"
-              className="btn btn-primary w-100 py-2 fw-semibold d-flex align-items-center justify-content-center gap-2 fs-15 shadow-sm"
+              className="btn btn-success w-100 py-2 fw-semibold d-flex align-items-center justify-content-center gap-2 fs-15 shadow-sm"
               onClick={onNext}
             >
-              <span>Continue: School Profile</span>
+              <span>Continue: {trialDays > 0 ? ` for ${trialDays} days` : '-'} Free Trial</span>
               <ArrowRight size={16} />
             </button>
           </div>
