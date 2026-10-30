@@ -552,11 +552,6 @@ export default function StepPlan({
       if (res?.data) {
         if (setAppliedCoupon) setAppliedCoupon(res.data);
         if (setIsTrialMode) setIsTrialMode(false);
-        if (typeof window !== 'undefined') {
-          const url = new URL(window.location.href);
-          url.searchParams.set('trial', '0');
-          window.history.replaceState({}, '', url.toString());
-        }
       } else {
         setCouponError(res?.message || 'Invalid coupon code.');
       }
@@ -572,11 +567,6 @@ export default function StepPlan({
     if (setCouponCode) setCouponCode('');
     setCouponError('');
     if (setIsTrialMode) setIsTrialMode(true);
-    if (typeof window !== 'undefined') {
-      const url = new URL(window.location.href);
-      url.searchParams.set('trial', '1');
-      window.history.replaceState({}, '', url.toString());
-    }
   };
 
   // Extract SMS & Push items if listed on plan items
