@@ -286,8 +286,12 @@ function OnboardingPaymentSuccessContent() {
             {/* Invoice Header */}
             <div className="d-flex flex-wrap align-items-start justify-content-between border-bottom pb-4 mb-4 gap-3">
               <div>
-                <div className="d-flex align-items-center gap-2 mb-1">
-                  <span className="fw-bold fs-4 text-primary">GrowVidya</span>
+                <div className="d-flex align-items-center gap-2 mb-2">
+                  <img
+                    src="/logo_dark.png"
+                    alt="GrowVidya"
+                    style={{ height: '42px', width: 'auto', objectFit: 'contain' }}
+                  />
                   <span className="badge bg-light text-secondary border fs-11 px-2 py-1">
                     Cloud School ERP
                   </span>
