@@ -1371,7 +1371,7 @@ export default function StepPlan({
                     <span className="fw-bold text-dark fs-14">
                       ₹{basePrice.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
                     </span>
-                    {isTrialMode && !appliedCoupon && (
+                    {(isTrialMode || trialDays > 0) && (
                       <div className="badge bg-success-subtle text-success fs-10 px-2 py-1 d-block mt-1">
                         Free Trial
                       </div>

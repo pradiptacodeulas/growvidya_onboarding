@@ -253,7 +253,10 @@ export default function StepReview({
       shipping_address: hasPhysicalHardware
         ? resolvedShippingAddress.trim()
         : campusContactData?.address || null,
-      coupon_code: appliedCoupon ? appliedCoupon.code : null,
+      coupon_code:
+        appliedCoupon && (!isTrialAction || trialDiscountAmount > 0)
+          ? appliedCoupon.code
+          : null,
       school: {
         school_name: schoolProfileData.school_name,
         school_code: schoolProfileData.school_code || null,
@@ -410,7 +413,10 @@ export default function StepReview({
           quantity: Number(n.quantity),
           type: n.type || n.channel,
         })),
-        coupon_code: appliedCoupon ? appliedCoupon.code : null,
+        coupon_code:
+          appliedCoupon && (!isTrialAction || trialDiscountAmount > 0)
+            ? appliedCoupon.code
+            : null,
         shipping_address: hasPhysicalHardware
           ? resolvedShippingAddress.trim()
           : campusContactData.address || null,
@@ -513,6 +519,30 @@ export default function StepReview({
           });
         } catch {
           // Non-blocking audit log
+        }
+        if (typeof window !== 'undefined') {
+          try {
+            const failureDraftSnapshot = {
+              currentStep: 5,
+              selectedPlanId: selectedPlan?.id || null,
+              billingCycle: selectedPlan?.billing_cycle || '',
+              isTrialMode: isTrialAction,
+              selectedStorageId,
+              selectedMachines,
+              selectedCards,
+              selectedNotifications,
+              shippingAddress: resolvedShippingAddress,
+              couponCode,
+              appliedCoupon,
+              schoolProfileData,
+              campusContactData,
+              academicYearData,
+              adminData,
+            };
+            sessionStorage.setItem(DRAFT_STORAGE_KEY, JSON.stringify(failureDraftSnapshot));
+          } catch (storageErr) {
+            console.warn('Could not persist failure recovery draft:', storageErr);
+          }
         }
         setSubmitting(false);
         setStatusMessage('');
@@ -966,8 +996,9 @@ export default function StepReview({
           Back
         </button>
 
+
         <div className="d-flex flex-wrap align-items-center gap-3 ms-auto">
-          {hasTrialOption && !appliedCoupon ? (
+          {hasTrialOption ? (
             <>
               <button
                 type="button"
@@ -1046,6 +1077,7 @@ export default function StepReview({
             </button>
           )}
         </div>
+
       </div>
     </div>
   );

@@ -35,7 +35,6 @@ function RegisterContent() {
 
   const [currentStep, setCurrentStep] = useState(0);
   const [loading, setLoading] = useState(true);
-  const [draftHydrated, setDraftHydrated] = useState(false);
   const [plans, setPlans] = useState([]);
   const [selectedPlan, setSelectedPlan] = useState(null);
   const [billingCycle, setBillingCycle] = useState(cycleParam);
@@ -113,14 +112,82 @@ function RegisterContent() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [planIdParam, cycleParam, trialRawParam]);
 
+  const resetFormStatesToDefault = () => {
+    setCurrentStep(0);
+    setSelectedStorageId(null);
+    setSelectedMachines({});
+    setSelectedCards({});
+    setSelectedNotifications({});
+    setShippingAddress('');
+    setCouponCode('');
+    setAppliedCoupon(null);
+    setSchoolProfileData({
+      school_name: '',
+      school_code: '',
+      school_type: '',
+      affiliation_board: '',
+      medium_of_instruction: '',
+      established_year: '',
+      registration_type: 'single',
+      school_logo: null,
+    });
+    setCampusContactData({
+      phone_number: '',
+      email: '',
+      website: '',
+      address: '',
+      country: '',
+      country_name: '',
+      state: '',
+      state_name: '',
+      city: '',
+      city_name: '',
+      postal_code: '',
+      footer: '',
+    });
+    setAcademicYearData({
+      academic_year: '',
+      start_date: '',
+      end_date: '',
+    });
+    setAdminData({
+      first_name: '',
+      last_name: '',
+      email: '',
+      phone: '',
+      gender: '',
+      gender_name: '',
+      picture: null,
+      password: '',
+      confirm_password: '',
+    });
+  };
+
   const initializeWizard = async () => {
     let savedDraft = null;
     if (typeof window !== 'undefined') {
       try {
-        const raw = sessionStorage.getItem(DRAFT_STORAGE_KEY);
-        if (raw) savedDraft = JSON.parse(raw);
+        const navEntry = window.performance?.getEntriesByType?.('navigation')?.[0];
+        const isReload =
+          navEntry?.type === 'reload' || window.performance?.navigation?.type === 1;
+        const isValidResume =
+          (resumeParam === 'review' || resumeParam === 'plan') && !isReload;
+
+        if (isValidResume) {
+          const raw = sessionStorage.getItem(DRAFT_STORAGE_KEY);
+          if (raw) savedDraft = JSON.parse(raw);
+          sessionStorage.removeItem(DRAFT_STORAGE_KEY);
+
+          // Strip ?resume=... from URL so a subsequent refresh resets cleanly
+          const cleanUrl = new URL(window.location.href);
+          cleanUrl.searchParams.delete('resume');
+          window.history.replaceState({}, '', cleanUrl.toString());
+        } else {
+          sessionStorage.removeItem(DRAFT_STORAGE_KEY);
+          resetFormStatesToDefault();
+        }
       } catch (e) {
-        console.warn('Could not read onboarding draft from sessionStorage:', e);
+        console.warn('Could not manage onboarding draft in sessionStorage:', e);
       }
     }
 
@@ -140,10 +207,8 @@ function RegisterContent() {
 
       if (resumeParam === 'review') {
         setCurrentStep(5);
-      } else if (resumeParam === 'plan') {
+      } else {
         setCurrentStep(0);
-      } else if (typeof savedDraft.currentStep === 'number' && !planIdParam) {
-        setCurrentStep(Math.min(5, Math.max(0, savedDraft.currentStep)));
       }
     }
 
@@ -240,53 +305,8 @@ function RegisterContent() {
     } finally {
       setLoading(false);
       setCatalogLoading(false);
-      setDraftHydrated(true);
     }
   };
-
-  // Persist draft state in sessionStorage so Retry Payment from /payment/failed restores 100% of fields
-  useEffect(() => {
-    if (!draftHydrated || typeof window === 'undefined') return;
-    try {
-      const snapshot = {
-        currentStep,
-        selectedPlanId: selectedPlan?.id || null,
-        billingCycle,
-        isTrialMode,
-        selectedStorageId,
-        selectedMachines,
-        selectedCards,
-        selectedNotifications,
-        shippingAddress,
-        couponCode,
-        appliedCoupon,
-        schoolProfileData,
-        campusContactData,
-        academicYearData,
-        adminData,
-      };
-      sessionStorage.setItem(DRAFT_STORAGE_KEY, JSON.stringify(snapshot));
-    } catch (e) {
-      console.warn('Could not persist onboarding draft:', e);
-    }
-  }, [
-    draftHydrated,
-    currentStep,
-    selectedPlan?.id,
-    billingCycle,
-    isTrialMode,
-    selectedStorageId,
-    selectedMachines,
-    selectedCards,
-    selectedNotifications,
-    shippingAddress,
-    couponCode,
-    appliedCoupon,
-    schoolProfileData,
-    campusContactData,
-    academicYearData,
-    adminData,
-  ]);
 
   // Keep shipping address synced with campus address until explicitly customized
   useEffect(() => {
