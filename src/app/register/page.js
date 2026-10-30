@@ -353,6 +353,8 @@ function RegisterContent() {
           setCouponCode={setCouponCode}
           appliedCoupon={appliedCoupon}
           setAppliedCoupon={setAppliedCoupon}
+          adminData={adminData}
+          campusContactData={campusContactData}
           onNext={() => setCurrentStep(1)}
         />
       )}

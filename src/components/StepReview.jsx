@@ -253,10 +253,7 @@ export default function StepReview({
       shipping_address: hasPhysicalHardware
         ? resolvedShippingAddress.trim()
         : campusContactData?.address || null,
-      coupon_code:
-        appliedCoupon && (!isTrialAction || trialDiscountAmount > 0)
-          ? appliedCoupon.code
-          : null,
+      coupon_code: appliedCoupon ? appliedCoupon.code : null,
       school: {
         school_name: schoolProfileData.school_name,
         school_code: schoolProfileData.school_code || null,
@@ -413,10 +410,7 @@ export default function StepReview({
           quantity: Number(n.quantity),
           type: n.type || n.channel,
         })),
-        coupon_code:
-          appliedCoupon && (!isTrialAction || trialDiscountAmount > 0)
-            ? appliedCoupon.code
-            : null,
+        coupon_code: appliedCoupon ? appliedCoupon.code : null,
         shipping_address: hasPhysicalHardware
           ? resolvedShippingAddress.trim()
           : campusContactData.address || null,

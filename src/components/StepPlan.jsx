@@ -65,6 +65,8 @@ export default function StepPlan({
   setCouponCode,
   appliedCoupon = null,
   setAppliedCoupon,
+  adminData = {},
+  campusContactData = {},
   onNext,
 }) {
   const [showPlanSwitcher, setShowPlanSwitcher] = useState(false);
@@ -547,6 +549,8 @@ export default function StepPlan({
         amount: activeSub,
         plan_amount: activePlanAmt,
         storage_amount: storagePrice,
+        email: adminData?.email || campusContactData?.email || null,
+        phone: adminData?.phone || campusContactData?.phone_number || null,
       });
 
       if (res?.data) {

@@ -46,7 +46,7 @@ const formatPaymentMethodLabel = (method) => {
 function OnboardingPaymentSuccessContent() {
   const searchParams = useSearchParams();
   const orderNoParam = searchParams.get('order_no') || searchParams.get('orderNo') || '';
-  const portalUrl = (process.env.NEXT_PUBLIC_PORTAL_URL || '').replace(/\/+$/, '');
+  const portalUrl = (process.env.NEXT_PUBLIC_PORTAL_URL || '').trim();
 
   const [sessionResult, setSessionResult] = useState(null);
   const [order, setOrder] = useState(null);
@@ -128,9 +128,7 @@ function OnboardingPaymentSuccessContent() {
   const schoolPhone = order?.school?.phone || '';
   const schoolAddress = order?.school?.address || order?.shipping_address || '';
 
-  const portalLaunchUrl = `${portalUrl}/account/login/adminlogin?registered=1${
-    adminEmail ? `&email=${encodeURIComponent(adminEmail)}` : ''
-  }`;
+  const portalLaunchUrl = portalUrl;
 
   const lineItems =
     Array.isArray(order?.line_items) && order.line_items.length > 0
