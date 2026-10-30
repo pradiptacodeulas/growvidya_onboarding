@@ -150,8 +150,8 @@ export default function StepReview({
       scope === 'all'
         ? planAmt + addonsTotal
         : scope === 'software_and_storage'
-        ? planAmt + storagePrice
-        : planAmt;
+          ? planAmt + storagePrice
+          : planAmt;
 
     if (eligibleSubtotal <= 0) return 0;
     const minOrder = parseFloat(
@@ -168,9 +168,9 @@ export default function StepReview({
       disc = (eligibleSubtotal * dVal) / 100;
       const maxD = parseFloat(
         appliedCoupon.max_discount ??
-          appliedCoupon.max_discount_amount ??
-          appliedCoupon.maxDiscountAmount ??
-          0
+        appliedCoupon.max_discount_amount ??
+        appliedCoupon.maxDiscountAmount ??
+        0
       );
       if (maxD > 0 && disc > maxD) disc = maxD;
     } else if (dVal > 0) {
@@ -386,7 +386,7 @@ export default function StepReview({
         if (eligData && (eligData.is_eligible === false || eligData.eligible === false)) {
           setErrorMessage(
             eligData.reason ||
-              'A free trial has already been claimed for this institution or contact. Please proceed with a paid plan.'
+            'A free trial has already been claimed for this institution or contact. Please proceed with a paid plan.'
           );
           setSubmitting(false);
           setStatusMessage('');
@@ -482,9 +482,9 @@ export default function StepReview({
             console.error('Post-payment registration error:', regErr);
             setErrorMessage(
               regErr.response?.data?.message ||
-                regErr.message ||
-                'Payment was captured, but portal setup encountered an issue. Please contact support with Order Ref: ' +
-                  (orderData.order_no || '')
+              regErr.message ||
+              'Payment was captured, but portal setup encountered an issue. Please contact support with Order Ref: ' +
+              (orderData.order_no || '')
             );
             setSubmitting(false);
             setStatusMessage('');
@@ -528,8 +528,8 @@ export default function StepReview({
       console.error('Onboarding checkout error:', err);
       setErrorMessage(
         err.response?.data?.message ||
-          err.message ||
-          'Unable to complete registration checkout. Please verify your details and try again.'
+        err.message ||
+        'Unable to complete registration checkout. Please verify your details and try again.'
       );
       setSubmitting(false);
       setStatusMessage('');
@@ -754,8 +754,8 @@ export default function StepReview({
                   {hasTrialOption
                     ? `${cycleMeta.label} License • Includes ${trialDays}-Day Free Trial Option`
                     : isPureFreeOrTrial
-                    ? `Free Evaluation Access${trialDays > 0 ? ` (${trialDays} Days)` : ''}`
-                    : `${cycleMeta.label} License • Unlimited Teachers & Branches • ${Math.max(
+                      ? `Free Evaluation Access${trialDays > 0 ? ` (${trialDays} Days)` : ''}`
+                      : `${cycleMeta.label} License • Unlimited Teachers & Branches • ${Math.max(
                         0,
                         parseInt(selectedPlan?.included_storage_gb, 10) || 0
                       )} GB Base Cloud Storage`}
@@ -835,8 +835,8 @@ export default function StepReview({
                         {(appliedCoupon.applicable_scope || appliedCoupon.applicableScope) === 'all'
                           ? 'Applies to Full Order'
                           : (appliedCoupon.applicable_scope || appliedCoupon.applicableScope) === 'software_and_storage'
-                          ? 'Applies to Software & Storage'
-                          : 'Applies to Base Plan'}
+                            ? 'Applies to Software & Storage'
+                            : 'Applies to Base Plan'}
                         ) — You save ₹{Number(displayDiscount).toLocaleString('en-IN', { minimumFractionDigits: 2 })}.
                       </div>
                     )}
@@ -971,6 +971,24 @@ export default function StepReview({
             <>
               <button
                 type="button"
+                className="btn btn-primary px-4 py-2 fw-semibold fs-14 shadow-sm"
+                onClick={() => executeOnboardingCheckout(false)}
+                disabled={submitting}
+              >
+                {submitting && !isTrialMode ? (
+                  <span className="d-inline-flex align-items-center gap-2">
+                    <Loader2 size={16} className="animate-spin" />
+                    <span>Processing...</span>
+                  </span>
+                ) : finalPaidAmount <= 0 ? (
+                  `Activate ${selectedPlan?.plan_name} Now (₹0)`
+                ) : (
+                  `Pay ₹${Number(finalPaidAmount).toLocaleString('en-IN')} & Activate`
+                )}
+              </button>
+
+              <button
+                type="button"
                 className="btn btn-outline-success px-4 py-2 fw-semibold fs-14"
                 onClick={() => executeOnboardingCheckout(true)}
                 disabled={submitting}
@@ -987,23 +1005,6 @@ export default function StepReview({
                 )}
               </button>
 
-              <button
-                type="button"
-                className="btn btn-primary px-4 py-2 fw-semibold fs-14 shadow-sm"
-                onClick={() => executeOnboardingCheckout(false)}
-                disabled={submitting}
-              >
-                {submitting && !isTrialMode ? (
-                  <span className="d-inline-flex align-items-center gap-2">
-                    <Loader2 size={16} className="animate-spin" />
-                    <span>Processing...</span>
-                  </span>
-                ) : finalPaidAmount <= 0 ? (
-                  `Activate ${selectedPlan?.plan_name} Now (₹0)`
-                ) : (
-                  `Pay ₹${Number(finalPaidAmount).toLocaleString('en-IN')} & Activate`
-                )}
-              </button>
             </>
           ) : isPureFreeOrTrial ? (
             <button
