@@ -138,11 +138,11 @@ export default function StepPlan({
     const trialFlag = appliedCoupon
       ? false
       : Boolean(
-          activateAsTrial ||
-            planCycle === 'trial' ||
-            parseFloat(plan.price) <= 0 ||
-            parseInt(plan.free_trial_days, 10) > 0
-        );
+        activateAsTrial ||
+        planCycle === 'trial' ||
+        parseFloat(plan.price) <= 0 ||
+        parseInt(plan.free_trial_days, 10) > 0
+      );
     if (setIsTrialMode) {
       setIsTrialMode(trialFlag);
     }
@@ -495,8 +495,8 @@ export default function StepPlan({
       scope === 'all'
         ? planAmt + addonsTotal
         : scope === 'software_and_storage'
-        ? planAmt + storagePrice
-        : planAmt;
+          ? planAmt + storagePrice
+          : planAmt;
 
     if (eligibleSubtotal <= 0) return 0;
     const minOrder = parseFloat(
@@ -514,9 +514,9 @@ export default function StepPlan({
       disc = (eligibleSubtotal * dVal) / 100;
       const maxD = parseFloat(
         appliedCoupon.max_discount ??
-          appliedCoupon.max_discount_amount ??
-          appliedCoupon.maxDiscountAmount ??
-          0
+        appliedCoupon.max_discount_amount ??
+        appliedCoupon.maxDiscountAmount ??
+        0
       );
       if (maxD > 0 && disc > maxD) disc = maxD;
     } else if (dVal > 0) {
@@ -626,7 +626,7 @@ export default function StepPlan({
                     {Math.round(
                       ((Number(selectedPlan.original_price) - Number(selectedPlan.price)) /
                         Number(selectedPlan.original_price)) *
-                        100
+                      100
                     )}
                     % OFF
                   </span>
@@ -746,9 +746,8 @@ export default function StepPlan({
                 {planItems.map((it) => (
                   <div key={it.id || it.item_code} className="col-12 col-md-6">
                     <div
-                      className={`p-3 rounded-3 bg-light border d-flex ${
-                        it.description ? 'align-items-start' : 'align-items-center'
-                      } gap-3 h-100`}
+                      className={`p-3 rounded-3 bg-light border d-flex ${it.description ? 'align-items-start' : 'align-items-center'
+                        } gap-3 h-100`}
                     >
                       <div
                         className="rounded-circle bg-success-subtle text-success d-flex align-items-center justify-content-center flex-shrink-0"
@@ -844,22 +843,20 @@ export default function StepPlan({
                         return (
                           <div key={st.id} className="col-12 col-sm-6 col-xl-3">
                             <div
-                              className={`p-3 rounded-3 border h-100 transition-all ${
-                                isSelected
+                              className={`p-3 rounded-3 border h-100 transition-all ${isSelected
                                   ? 'bg-primary-subtle border-primary shadow-sm'
                                   : 'bg-white hover-shadow border-light-subtle'
-                              }`}
+                                }`}
                               style={{ cursor: 'pointer', transition: 'all 0.15s ease-in-out' }}
                               onClick={() => handleSelectStorage(st.id)}
                             >
                               <div className="d-flex align-items-center justify-content-between mb-2">
                                 <span className="fw-bold fs-15 text-dark">{st.plan_name}</span>
                                 <div
-                                  className={`rounded-circle d-flex align-items-center justify-content-center border ${
-                                    isSelected
+                                  className={`rounded-circle d-flex align-items-center justify-content-center border ${isSelected
                                       ? 'bg-primary text-white border-primary'
                                       : 'bg-light border-secondary-subtle'
-                                  }`}
+                                    }`}
                                   style={{ width: '20px', height: '20px' }}
                                 >
                                   {isSelected && <Check size={12} strokeWidth={3} />}
@@ -955,9 +952,8 @@ export default function StepPlan({
                       return (
                         <div key={m.id} className="col-12 col-md-6">
                           <div
-                            className={`p-3 rounded-3 border h-100 d-flex flex-column ${
-                              isAdded ? 'bg-white border-success shadow-sm' : 'bg-white border-light-subtle'
-                            }`}
+                            className={`p-3 rounded-3 border h-100 d-flex flex-column ${isAdded ? 'bg-white border-success shadow-sm' : 'bg-white border-light-subtle'
+                              }`}
                           >
                             <div className="d-flex gap-3 align-items-start mb-3">
                               {imgUrl ? (
@@ -1109,9 +1105,8 @@ export default function StepPlan({
                       return (
                         <div key={c.id} className="col-12 col-md-6">
                           <div
-                            className={`p-3 rounded-3 border h-100 d-flex flex-column ${
-                              isAdded ? 'bg-white border-warning shadow-sm' : 'bg-white border-light-subtle'
-                            }`}
+                            className={`p-3 rounded-3 border h-100 d-flex flex-column ${isAdded ? 'bg-white border-warning shadow-sm' : 'bg-white border-light-subtle'
+                              }`}
                           >
                             <div className="d-flex gap-3 align-items-start mb-3">
                               {imgUrl ? (
@@ -1260,9 +1255,8 @@ export default function StepPlan({
                       return (
                         <div key={n.id} className="col-12 col-md-6">
                           <div
-                            className={`p-3 rounded-3 border h-100 ${
-                              isSelected ? 'bg-white border-info shadow-sm' : 'bg-white border-light-subtle'
-                            }`}
+                            className={`p-3 rounded-3 border h-100 ${isSelected ? 'bg-white border-info shadow-sm' : 'bg-white border-light-subtle'
+                              }`}
                           >
                             <div className="d-flex align-items-center justify-content-between mb-1">
                               <span className="fw-bold fs-15 text-dark text-capitalize">
@@ -1450,11 +1444,11 @@ export default function StepPlan({
                     {selectedCardsList.length === 1
                       ? `₹${selectedCardsList[0].unitPrice.toLocaleString('en-IN')} / card`
                       : selectedCardsList.map((c, idx) => (
-                          <span key={c.id}>
-                            {idx > 0 && <span className="mx-2 text-secondary">•</span>}
-                            {c.card_name}: {c.quantity} pcs @ ₹{c.unitPrice.toLocaleString('en-IN')}
-                          </span>
-                        ))}
+                        <span key={c.id}>
+                          {idx > 0 && <span className="mx-2 text-secondary">•</span>}
+                          {c.card_name}: {c.quantity} pcs @ ₹{c.unitPrice.toLocaleString('en-IN')}
+                        </span>
+                      ))}
                   </div>
                 </div>
                 <div className="text-end flex-shrink-0">
@@ -1585,10 +1579,10 @@ export default function StepPlan({
                   {appliedCoupon
                     ? 'Coupon discount applied • Proceed with discounted payment'
                     : isTrialMode || isPureTrialPlan
-                    ? trialDays > 0
-                      ? `Includes ${trialDays}-day free trial option`
-                      : 'Free evaluation access'
-                    : 'Flat net pricing • No extra charges'}
+                      ? trialDays > 0
+                        ? `Includes ${trialDays}-day free trial option`
+                        : 'Free evaluation access'
+                      : 'Flat net pricing • No extra charges'}
                 </div>
               </div>
               <div className="fs-20 fw-bold text-primary">
@@ -1612,13 +1606,11 @@ export default function StepPlan({
           <div className="pt-2">
             <button
               type="button"
-              className={`btn ${appliedCoupon ? 'btn-primary' : 'btn-success'} w-100 py-2 fw-semibold d-flex align-items-center justify-content-center gap-2 fs-15 shadow-sm`}
+              className="btn btn-success w-100 py-2 fw-semibold d-flex align-items-center justify-content-center gap-2 fs-15 shadow-sm"
               onClick={onNext}
             >
               <span>
-                {appliedCoupon
-                  ? `Continue with Discounted Price (₹${grandTotal.toLocaleString('en-IN')})`
-                  : `Continue: ${trialDays > 0 ? `for ${trialDays} days ` : ''}Free Trial`}
+                Continue: {trialDays > 0 ? `for ${trialDays} days ` : ''}Free Trial
               </span>
               <ArrowRight size={16} />
             </button>
