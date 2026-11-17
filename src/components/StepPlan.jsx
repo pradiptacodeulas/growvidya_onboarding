@@ -25,10 +25,10 @@ import {
   Tag,
   Loader2,
 } from 'lucide-react';
-import saasApi from '../lib/api';
+import saasApi, { getServerBaseUrl } from '../lib/api';
 
-const API_BASE = (process.env.NEXT_PUBLIC_API_BASE_URL || '').replace(/\/+$/, '');
-const SERVER_BASE = API_BASE.replace(/\/api\/?$/, '');
+
+const SERVER_BASE = getServerBaseUrl();
 
 const resolveImageUrl = (pic) => {
   if (!pic || String(pic).trim() === '' || pic === 'null' || pic === 'undefined') {
@@ -576,7 +576,7 @@ export default function StepPlan({
     if (codeToRelease) {
       try {
         await saasApi.removeCoupon({ code: codeToRelease });
-      } catch (_) {}
+      } catch (_) { }
     }
   };
 
@@ -853,8 +853,8 @@ export default function StepPlan({
                           <div key={st.id} className="col-12 col-sm-6 col-xl-3">
                             <div
                               className={`p-3 rounded-3 border h-100 transition-all ${isSelected
-                                  ? 'bg-primary-subtle border-primary shadow-sm'
-                                  : 'bg-white hover-shadow border-light-subtle'
+                                ? 'bg-primary-subtle border-primary shadow-sm'
+                                : 'bg-white hover-shadow border-light-subtle'
                                 }`}
                               style={{ cursor: 'pointer', transition: 'all 0.15s ease-in-out' }}
                               onClick={() => handleSelectStorage(st.id)}
@@ -863,8 +863,8 @@ export default function StepPlan({
                                 <span className="fw-bold fs-15 text-dark">{st.plan_name}</span>
                                 <div
                                   className={`rounded-circle d-flex align-items-center justify-content-center border ${isSelected
-                                      ? 'bg-primary text-white border-primary'
-                                      : 'bg-light border-secondary-subtle'
+                                    ? 'bg-primary text-white border-primary'
+                                    : 'bg-light border-secondary-subtle'
                                     }`}
                                   style={{ width: '20px', height: '20px' }}
                                 >
@@ -910,304 +910,309 @@ export default function StepPlan({
           </div>
 
           {/* 2. BIOMETRIC ATTENDANCE TERMINALS */}
-          <div className="border rounded-3 p-3 p-md-4 mb-4 bg-light-subtle">
-            <div
-              className="d-flex align-items-center justify-content-between"
-              style={{ cursor: 'pointer' }}
-              onClick={() => toggleSection('machines')}
-            >
-              <div className="d-flex align-items-center gap-3">
-                <div
-                  className="rounded-3 bg-success-subtle text-success d-flex align-items-center justify-content-center"
-                  style={{ width: '40px', height: '40px' }}
-                >
-                  <Cpu size={20} />
-                </div>
-                <div>
-                  <h5 className="fw-bold text-dark mb-0 fs-16">Biometric Attendance Terminals</h5>
-                  <p className="text-muted fs-13 mb-0">
-                    Fingerprint, Facial Recognition, and RFID integrated attendance hardware (one-time purchase)
-                  </p>
-                </div>
-              </div>
-              <div className="d-flex align-items-center gap-2">
-                {machinesTotal > 0 && (
-                  <span className="badge bg-success text-white rounded-pill px-3 py-1 fs-12 fw-semibold">
-                    +₹{machinesTotal.toLocaleString('en-IN')}
-                  </span>
-                )}
-                {collapsedSections.machines ? (
-                  <ChevronDown size={20} className="text-muted" />
-                ) : (
-                  <ChevronUp size={20} className="text-muted" />
-                )}
-              </div>
-            </div>
-
-            {!collapsedSections.machines && (
-              <div className="mt-4 pt-3 border-top">
-                {attendanceMachines.length === 0 ? (
-                  <div className="text-center py-4 bg-white rounded-3 border text-muted">
-                    <Cpu size={28} className="text-secondary opacity-50 mb-2" />
-                    <p className="mb-0 fs-13">No biometric machines currently listed in catalog.</p>
+          {attendanceMachines.length != 0 && (
+            <div className="border rounded-3 p-3 p-md-4 mb-4 bg-light-subtle">
+              <div
+                className="d-flex align-items-center justify-content-between"
+                style={{ cursor: 'pointer' }}
+                onClick={() => toggleSection('machines')}
+              >
+                <div className="d-flex align-items-center gap-3">
+                  <div
+                    className="rounded-3 bg-success-subtle text-success d-flex align-items-center justify-content-center"
+                    style={{ width: '40px', height: '40px' }}
+                  >
+                    <Cpu size={20} />
                   </div>
-                ) : (
-                  <div className="row g-3">
-                    {attendanceMachines.map((m) => {
-                      const qty = selectedMachines[m.id] || 0;
-                      const isAdded = qty > 0;
-                      const imgUrl = resolveImageUrl(m.machine_image);
+                  <div>
+                    <h5 className="fw-bold text-dark mb-0 fs-16">Biometric Attendance Terminals</h5>
+                    <p className="text-muted fs-13 mb-0">
+                      Fingerprint, Facial Recognition, and RFID integrated attendance hardware (one-time purchase)
+                    </p>
+                  </div>
+                </div>
+                <div className="d-flex align-items-center gap-2">
+                  {machinesTotal > 0 && (
+                    <span className="badge bg-success text-white rounded-pill px-3 py-1 fs-12 fw-semibold">
+                      +₹{machinesTotal.toLocaleString('en-IN')}
+                    </span>
+                  )}
+                  {collapsedSections.machines ? (
+                    <ChevronDown size={20} className="text-muted" />
+                  ) : (
+                    <ChevronUp size={20} className="text-muted" />
+                  )}
+                </div>
+              </div>
 
-                      return (
-                        <div key={m.id} className="col-12 col-md-6">
-                          <div
-                            className={`p-3 rounded-3 border h-100 d-flex flex-column ${isAdded ? 'bg-white border-success shadow-sm' : 'bg-white border-light-subtle'
-                              }`}
-                          >
-                            <div className="d-flex gap-3 align-items-start mb-3">
-                              {imgUrl ? (
-                                <img
-                                  src={imgUrl}
-                                  alt={m.machine_name}
-                                  className="rounded-3 border object-fit-cover"
-                                  style={{ width: '64px', height: '64px', minWidth: '64px' }}
-                                />
-                              ) : (
-                                <div
-                                  className="rounded-3 bg-light border d-flex align-items-center justify-content-center text-muted"
-                                  style={{ width: '64px', height: '64px', minWidth: '64px' }}
-                                >
-                                  <Cpu size={28} className="text-secondary" />
-                                </div>
-                              )}
+              {!collapsedSections.machines && (
+                <div className="mt-4 pt-3 border-top">
+                  {attendanceMachines.length === 0 ? (
+                    <div className="text-center py-4 bg-white rounded-3 border text-muted">
+                      <Cpu size={28} className="text-secondary opacity-50 mb-2" />
+                      <p className="mb-0 fs-13">No biometric machines currently listed in catalog.</p>
+                    </div>
+                  ) : (
+                    <div className="row g-3">
+                      {attendanceMachines.map((m) => {
+                        const qty = selectedMachines[m.id] || 0;
+                        const isAdded = qty > 0;
+                        const imgUrl = resolveImageUrl(m.machine_image);
 
-                              <div className="flex-grow-1 min-w-0">
-                                <h6 className="fw-bold text-dark mb-1 fs-15">{m.machine_name}</h6>
-                                <div className="fs-12 text-muted mb-1">
-                                  {m.brand && <span className="me-2">Brand: {m.brand}</span>}
-                                  {m.model_number && <span>Model: {m.model_number}</span>}
-                                </div>
-                                {(m.user_capacity || m.log_capacity) && (
-                                  <div className="fs-12 text-muted mb-1">
-                                    {m.user_capacity && (
-                                      <span className="me-2">
-                                        Capacity: {Number(m.user_capacity).toLocaleString('en-IN')} Users
-                                      </span>
-                                    )}
-                                    {m.log_capacity && (
-                                      <span>({Number(m.log_capacity).toLocaleString('en-IN')} Logs)</span>
-                                    )}
+                        return (
+                          <div key={m.id} className="col-12 col-md-6">
+                            <div
+                              className={`p-3 rounded-3 border h-100 d-flex flex-column ${isAdded ? 'bg-white border-success shadow-sm' : 'bg-white border-light-subtle'
+                                }`}
+                            >
+                              <div className="d-flex gap-3 align-items-start mb-3">
+                                {imgUrl ? (
+                                  <img
+                                    src={imgUrl}
+                                    alt={m.machine_name}
+                                    className="rounded-3 border object-fit-cover"
+                                    style={{ width: '64px', height: '64px', minWidth: '64px' }}
+                                  />
+                                ) : (
+                                  <div
+                                    className="rounded-3 bg-light border d-flex align-items-center justify-content-center text-muted"
+                                    style={{ width: '64px', height: '64px', minWidth: '64px' }}
+                                  >
+                                    <Cpu size={28} className="text-secondary" />
                                   </div>
                                 )}
-                                <div className="fs-16 fw-bold text-success">
-                                  ₹{parseFloat(m.unit_price || 0).toLocaleString('en-IN')}
-                                  <span className="fs-11 text-muted fw-normal"> / unit</span>
-                                </div>
-                              </div>
-                            </div>
 
-                            <div className="d-flex align-items-center justify-content-between pt-2 border-top mt-auto">
-                              {!isAdded ? (
-                                <button
-                                  type="button"
-                                  className="btn btn-outline-success btn-sm w-100 fw-semibold d-flex align-items-center justify-content-center gap-2"
-                                  onClick={() => handleAddMachine(m)}
-                                >
-                                  <Plus size={14} />
-                                  <span>Add Terminal</span>
-                                </button>
-                              ) : (
-                                <div className="d-flex align-items-center justify-content-between w-100">
-                                  <span className="fs-13 fw-semibold text-dark">
-                                    Subtotal: ₹{(parseFloat(m.unit_price || 0) * qty).toLocaleString('en-IN')}
-                                  </span>
-                                  <div className="d-flex align-items-center gap-2">
-                                    <button
-                                      type="button"
-                                      className="btn btn-sm btn-outline-secondary p-1 rounded-circle d-flex align-items-center justify-content-center"
-                                      style={{ width: '28px', height: '28px' }}
-                                      onClick={() => handleDecreaseMachineQty(m)}
-                                    >
-                                      <Minus size={14} />
-                                    </button>
-                                    <span className="fw-bold fs-14 px-2">{qty}</span>
-                                    <button
-                                      type="button"
-                                      className="btn btn-sm btn-outline-secondary p-1 rounded-circle d-flex align-items-center justify-content-center"
-                                      style={{ width: '28px', height: '28px' }}
-                                      onClick={() => handleIncreaseMachineQty(m)}
-                                    >
-                                      <Plus size={14} />
-                                    </button>
-                                    <button
-                                      type="button"
-                                      className="btn btn-sm text-danger ms-2 p-1"
-                                      onClick={() => handleRemoveMachine(m.id)}
-                                      title="Remove machine"
-                                    >
-                                      <Trash2 size={16} />
-                                    </button>
+                                <div className="flex-grow-1 min-w-0">
+                                  <h6 className="fw-bold text-dark mb-1 fs-15">{m.machine_name}</h6>
+                                  <div className="fs-12 text-muted mb-1">
+                                    {m.brand && <span className="me-2">Brand: {m.brand}</span>}
+                                    {m.model_number && <span>Model: {m.model_number}</span>}
+                                  </div>
+                                  {(m.user_capacity || m.log_capacity) && (
+                                    <div className="fs-12 text-muted mb-1">
+                                      {m.user_capacity && (
+                                        <span className="me-2">
+                                          Capacity: {Number(m.user_capacity).toLocaleString('en-IN')} Users
+                                        </span>
+                                      )}
+                                      {m.log_capacity && (
+                                        <span>({Number(m.log_capacity).toLocaleString('en-IN')} Logs)</span>
+                                      )}
+                                    </div>
+                                  )}
+                                  <div className="fs-16 fw-bold text-success">
+                                    ₹{parseFloat(m.unit_price || 0).toLocaleString('en-IN')}
+                                    <span className="fs-11 text-muted fw-normal"> / unit</span>
                                   </div>
                                 </div>
-                              )}
+                              </div>
+
+                              <div className="d-flex align-items-center justify-content-between pt-2 border-top mt-auto">
+                                {!isAdded ? (
+                                  <button
+                                    type="button"
+                                    className="btn btn-outline-success btn-sm w-100 fw-semibold d-flex align-items-center justify-content-center gap-2"
+                                    onClick={() => handleAddMachine(m)}
+                                  >
+                                    <Plus size={14} />
+                                    <span>Add Terminal</span>
+                                  </button>
+                                ) : (
+                                  <div className="d-flex align-items-center justify-content-between w-100">
+                                    <span className="fs-13 fw-semibold text-dark">
+                                      Subtotal: ₹{(parseFloat(m.unit_price || 0) * qty).toLocaleString('en-IN')}
+                                    </span>
+                                    <div className="d-flex align-items-center gap-2">
+                                      <button
+                                        type="button"
+                                        className="btn btn-sm btn-outline-secondary p-1 rounded-circle d-flex align-items-center justify-content-center"
+                                        style={{ width: '28px', height: '28px' }}
+                                        onClick={() => handleDecreaseMachineQty(m)}
+                                      >
+                                        <Minus size={14} />
+                                      </button>
+                                      <span className="fw-bold fs-14 px-2">{qty}</span>
+                                      <button
+                                        type="button"
+                                        className="btn btn-sm btn-outline-secondary p-1 rounded-circle d-flex align-items-center justify-content-center"
+                                        style={{ width: '28px', height: '28px' }}
+                                        onClick={() => handleIncreaseMachineQty(m)}
+                                      >
+                                        <Plus size={14} />
+                                      </button>
+                                      <button
+                                        type="button"
+                                        className="btn btn-sm text-danger ms-2 p-1"
+                                        onClick={() => handleRemoveMachine(m.id)}
+                                        title="Remove machine"
+                                      >
+                                        <Trash2 size={16} />
+                                      </button>
+                                    </div>
+                                  </div>
+                                )}
+                              </div>
                             </div>
                           </div>
-                        </div>
-                      );
-                    })}
-                  </div>
-                )}
-              </div>
-            )}
-          </div>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+          )}
+
 
           {/* 3. RFID SMART IDENTITY CARDS */}
-          <div className="border rounded-3 p-3 p-md-4 mb-4 bg-light-subtle">
-            <div
-              className="d-flex align-items-center justify-content-between"
-              style={{ cursor: 'pointer' }}
-              onClick={() => toggleSection('cards')}
-            >
-              <div className="d-flex align-items-center gap-3">
-                <div
-                  className="rounded-3 bg-warning-subtle text-warning d-flex align-items-center justify-content-center"
-                  style={{ width: '40px', height: '40px' }}
-                >
-                  <IdCard size={20} />
-                </div>
-                <div>
-                  <h5 className="fw-bold text-dark mb-0 fs-16">Smart RFID Student &amp; Staff Identity Cards</h5>
-                  <p className="text-muted fs-13 mb-0">
-                    Pre-encoded NFC/RFID cards compatible with biometric access gates
-                  </p>
-                </div>
-              </div>
-              <div className="d-flex align-items-center gap-2">
-                {cardsTotal > 0 && (
-                  <span className="badge bg-warning text-dark rounded-pill px-3 py-1 fs-12 fw-semibold">
-                    +₹{cardsTotal.toLocaleString('en-IN')}
-                  </span>
-                )}
-                {collapsedSections.cards ? (
-                  <ChevronDown size={20} className="text-muted" />
-                ) : (
-                  <ChevronUp size={20} className="text-muted" />
-                )}
-              </div>
-            </div>
-
-            {!collapsedSections.cards && (
-              <div className="mt-4 pt-3 border-top">
-                {rfidCards.length === 0 ? (
-                  <div className="text-center py-4 bg-white rounded-3 border text-muted">
-                    <IdCard size={28} className="text-secondary opacity-50 mb-2" />
-                    <p className="mb-0 fs-13">No RFID cards currently listed in catalog.</p>
+          {rfidCards.length != 0 && (
+            <div className="border rounded-3 p-3 p-md-4 mb-4 bg-light-subtle">
+              <div
+                className="d-flex align-items-center justify-content-between"
+                style={{ cursor: 'pointer' }}
+                onClick={() => toggleSection('cards')}
+              >
+                <div className="d-flex align-items-center gap-3">
+                  <div
+                    className="rounded-3 bg-warning-subtle text-warning d-flex align-items-center justify-content-center"
+                    style={{ width: '40px', height: '40px' }}
+                  >
+                    <IdCard size={20} />
                   </div>
-                ) : (
-                  <div className="row g-3">
-                    {rfidCards.map((c) => {
-                      const minQty = Math.max(1, parseInt(c.min_order_qty, 10) || 1);
-                      const qty = selectedCards[c.id] || 0;
-                      const isAdded = qty > 0;
-                      const imgUrl = resolveImageUrl(c.card_image || c.rfid_image);
+                  <div>
+                    <h5 className="fw-bold text-dark mb-0 fs-16">Smart RFID Student &amp; Staff Identity Cards</h5>
+                    <p className="text-muted fs-13 mb-0">
+                      Pre-encoded NFC/RFID cards compatible with biometric access gates
+                    </p>
+                  </div>
+                </div>
+                <div className="d-flex align-items-center gap-2">
+                  {cardsTotal > 0 && (
+                    <span className="badge bg-warning text-dark rounded-pill px-3 py-1 fs-12 fw-semibold">
+                      +₹{cardsTotal.toLocaleString('en-IN')}
+                    </span>
+                  )}
+                  {collapsedSections.cards ? (
+                    <ChevronDown size={20} className="text-muted" />
+                  ) : (
+                    <ChevronUp size={20} className="text-muted" />
+                  )}
+                </div>
+              </div>
 
-                      return (
-                        <div key={c.id} className="col-12 col-md-6">
-                          <div
-                            className={`p-3 rounded-3 border h-100 d-flex flex-column ${isAdded ? 'bg-white border-warning shadow-sm' : 'bg-white border-light-subtle'
-                              }`}
-                          >
-                            <div className="d-flex gap-3 align-items-start mb-3">
-                              {imgUrl ? (
-                                <img
-                                  src={imgUrl}
-                                  alt={c.card_name}
-                                  className="rounded-3 border object-fit-cover"
-                                  style={{ width: '64px', height: '64px', minWidth: '64px' }}
-                                />
-                              ) : (
-                                <div
-                                  className="rounded-3 bg-light border d-flex align-items-center justify-content-center text-muted"
-                                  style={{ width: '64px', height: '64px', minWidth: '64px' }}
-                                >
-                                  <IdCard size={28} className="text-secondary" />
-                                </div>
-                              )}
+              {!collapsedSections.cards && (
+                <div className="mt-4 pt-3 border-top">
+                  {rfidCards.length === 0 ? (
+                    <div className="text-center py-4 bg-white rounded-3 border text-muted">
+                      <IdCard size={28} className="text-secondary opacity-50 mb-2" />
+                      <p className="mb-0 fs-13">No RFID cards currently listed in catalog.</p>
+                    </div>
+                  ) : (
+                    <div className="row g-3">
+                      {rfidCards.map((c) => {
+                        const minQty = Math.max(1, parseInt(c.min_order_qty, 10) || 1);
+                        const qty = selectedCards[c.id] || 0;
+                        const isAdded = qty > 0;
+                        const imgUrl = resolveImageUrl(c.card_image || c.rfid_image);
 
-                              <div className="flex-grow-1 min-w-0">
-                                <h6 className="fw-bold text-dark mb-1 fs-15">{c.card_name}</h6>
-                                <div className="fs-12 text-muted mb-1">
-                                  {c.frequency && <span className="me-2">Freq: {c.frequency}</span>}
-                                  <span>Min order: {minQty} pcs</span>
-                                </div>
-                                <div className="fs-16 fw-bold text-warning-emphasis">
-                                  ₹{parseFloat(c.unit_price || 0).toLocaleString('en-IN')}
-                                  <span className="fs-11 text-muted fw-normal"> / card</span>
-                                </div>
-                              </div>
-                            </div>
+                        return (
+                          <div key={c.id} className="col-12 col-md-6">
+                            <div
+                              className={`p-3 rounded-3 border h-100 d-flex flex-column ${isAdded ? 'bg-white border-warning shadow-sm' : 'bg-white border-light-subtle'
+                                }`}
+                            >
+                              <div className="d-flex gap-3 align-items-start mb-3">
+                                {imgUrl ? (
+                                  <img
+                                    src={imgUrl}
+                                    alt={c.card_name}
+                                    className="rounded-3 border object-fit-cover"
+                                    style={{ width: '64px', height: '64px', minWidth: '64px' }}
+                                  />
+                                ) : (
+                                  <div
+                                    className="rounded-3 bg-light border d-flex align-items-center justify-content-center text-muted"
+                                    style={{ width: '64px', height: '64px', minWidth: '64px' }}
+                                  >
+                                    <IdCard size={28} className="text-secondary" />
+                                  </div>
+                                )}
 
-                            <div className="d-flex align-items-center justify-content-between pt-2 border-top mt-auto">
-                              {!isAdded ? (
-                                <button
-                                  type="button"
-                                  className="btn btn-outline-warning text-dark btn-sm w-100 fw-semibold d-flex align-items-center justify-content-center gap-2"
-                                  onClick={() => handleAddCard(c)}
-                                >
-                                  <Plus size={14} />
-                                  <span>Order Cards (Min. {minQty} pcs)</span>
-                                </button>
-                              ) : (
-                                <div className="d-flex align-items-center justify-content-between w-100 gap-2">
-                                  <span className="fs-13 fw-semibold text-dark">
-                                    ₹{(parseFloat(c.unit_price || 0) * qty).toLocaleString('en-IN')}
-                                  </span>
-                                  <div className="d-flex align-items-center gap-2">
-                                    <button
-                                      type="button"
-                                      className="btn btn-sm btn-outline-secondary p-1 rounded-circle d-flex align-items-center justify-content-center"
-                                      style={{ width: '28px', height: '28px' }}
-                                      onClick={() => handleDecreaseCardQty(c)}
-                                    >
-                                      <Minus size={14} />
-                                    </button>
-                                    <input
-                                      type="number"
-                                      min={minQty}
-                                      className="form-control form-control-sm text-center fw-bold px-1"
-                                      style={{ width: '68px', height: '30px' }}
-                                      value={qty}
-                                      onChange={(e) => handleSetCardQty(c, e.target.value)}
-                                    />
-                                    <button
-                                      type="button"
-                                      className="btn btn-sm btn-outline-secondary p-1 rounded-circle d-flex align-items-center justify-content-center"
-                                      style={{ width: '28px', height: '28px' }}
-                                      onClick={() => handleIncreaseCardQty(c)}
-                                    >
-                                      <Plus size={14} />
-                                    </button>
-                                    <button
-                                      type="button"
-                                      className="btn btn-sm text-danger ms-1 p-1"
-                                      onClick={() => handleRemoveCard(c.id)}
-                                      title="Remove cards"
-                                    >
-                                      <Trash2 size={16} />
-                                    </button>
+                                <div className="flex-grow-1 min-w-0">
+                                  <h6 className="fw-bold text-dark mb-1 fs-15">{c.card_name}</h6>
+                                  <div className="fs-12 text-muted mb-1">
+                                    {c.frequency && <span className="me-2">Freq: {c.frequency}</span>}
+                                    <span>Min order: {minQty} pcs</span>
+                                  </div>
+                                  <div className="fs-16 fw-bold text-warning-emphasis">
+                                    ₹{parseFloat(c.unit_price || 0).toLocaleString('en-IN')}
+                                    <span className="fs-11 text-muted fw-normal"> / card</span>
                                   </div>
                                 </div>
-                              )}
+                              </div>
+
+                              <div className="d-flex align-items-center justify-content-between pt-2 border-top mt-auto">
+                                {!isAdded ? (
+                                  <button
+                                    type="button"
+                                    className="btn btn-outline-warning text-dark btn-sm w-100 fw-semibold d-flex align-items-center justify-content-center gap-2"
+                                    onClick={() => handleAddCard(c)}
+                                  >
+                                    <Plus size={14} />
+                                    <span>Order Cards (Min. {minQty} pcs)</span>
+                                  </button>
+                                ) : (
+                                  <div className="d-flex align-items-center justify-content-between w-100 gap-2">
+                                    <span className="fs-13 fw-semibold text-dark">
+                                      ₹{(parseFloat(c.unit_price || 0) * qty).toLocaleString('en-IN')}
+                                    </span>
+                                    <div className="d-flex align-items-center gap-2">
+                                      <button
+                                        type="button"
+                                        className="btn btn-sm btn-outline-secondary p-1 rounded-circle d-flex align-items-center justify-content-center"
+                                        style={{ width: '28px', height: '28px' }}
+                                        onClick={() => handleDecreaseCardQty(c)}
+                                      >
+                                        <Minus size={14} />
+                                      </button>
+                                      <input
+                                        type="number"
+                                        min={minQty}
+                                        className="form-control form-control-sm text-center fw-bold px-1"
+                                        style={{ width: '68px', height: '30px' }}
+                                        value={qty}
+                                        onChange={(e) => handleSetCardQty(c, e.target.value)}
+                                      />
+                                      <button
+                                        type="button"
+                                        className="btn btn-sm btn-outline-secondary p-1 rounded-circle d-flex align-items-center justify-content-center"
+                                        style={{ width: '28px', height: '28px' }}
+                                        onClick={() => handleIncreaseCardQty(c)}
+                                      >
+                                        <Plus size={14} />
+                                      </button>
+                                      <button
+                                        type="button"
+                                        className="btn btn-sm text-danger ms-1 p-1"
+                                        onClick={() => handleRemoveCard(c.id)}
+                                        title="Remove cards"
+                                      >
+                                        <Trash2 size={16} />
+                                      </button>
+                                    </div>
+                                  </div>
+                                )}
+                              </div>
                             </div>
                           </div>
-                        </div>
-                      );
-                    })}
-                  </div>
-                )}
-              </div>
-            )}
-          </div>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+          )}
 
           {/* 4. PREPAID SMS & PUSH NOTIFICATION CREDITS */}
           <div className="border rounded-3 p-3 p-md-4 bg-light-subtle">

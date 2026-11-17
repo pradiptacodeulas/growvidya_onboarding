@@ -7,9 +7,16 @@ import { usePathname } from 'next/navigation';
 
 export default function Header() {
   const pathname = usePathname();
-  const portalUrl = (process.env.NEXT_PUBLIC_PORTAL_URL || '').replace(/\/+$/, '');
-  const adminLoginHref = portalUrl ? `${portalUrl}/account/login/adminlogin` : '/';
+  const rawPortalUrl = process.env.NEXT_PUBLIC_PORTAL_URL;
+  const portalUrl = rawPortalUrl ? rawPortalUrl.trim().replace(/\/+$/, '') : '';
   const isOnRegisterPage = pathname?.startsWith('/register');
+
+  const handleAdminLoginClick = (e) => {
+    if (!portalUrl) {
+      e.preventDefault();
+      alert('Configuration Error: NEXT_PUBLIC_PORTAL_URL is not defined in .env.');
+    }
+  };
 
   return (
     <header className="navbar navbar-light bg-white border-bottom shadow-sm py-3 px-3 px-md-5 sticky-top no-print">
@@ -36,14 +43,13 @@ export default function Header() {
               View Plans
             </Link>
           )}
-          {portalUrl && (
-            <a
-              href={adminLoginHref}
-              className="btn btn-outline-secondary btn-sm fw-semibold px-3 py-1"
-            >
-              Already Registered? Admin Login
-            </a>
-          )}
+          <a
+            href={portalUrl ? `${portalUrl}/account/login/adminlogin` : '#'}
+            onClick={handleAdminLoginClick}
+            className="btn btn-outline-secondary btn-sm fw-semibold px-3 py-1"
+          >
+            Already Registered? Admin Login
+          </a>
         </div>
       </div>
     </header>

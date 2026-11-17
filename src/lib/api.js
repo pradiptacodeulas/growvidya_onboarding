@@ -1,13 +1,48 @@
 import axios from 'axios';
 
-const API_BASE = (process.env.NEXT_PUBLIC_API_BASE_URL || '').replace(/\/+$/, '');
+/**
+ * Retrieves the API base URL strictly from NEXT_PUBLIC_API_BASE_URL.
+ * Does not use fallback data or hardcoded URLs.
+ * Throws an explicit error if the required environment variable is missing.
+ */
+export const getApiBaseUrl = () => {
+  const envUrl = process.env.NEXT_PUBLIC_API_BASE_URL;
+
+  if (!envUrl || !envUrl.trim()) {
+    throw new Error(
+      'Missing required environment variable: NEXT_PUBLIC_API_BASE_URL is not defined in .env. Please configure NEXT_PUBLIC_API_BASE_URL in your .env file.'
+    );
+  }
+
+  return envUrl.trim().replace(/\/+$/, '');
+};
+
+/**
+ * Retrieves the server base URL derived strictly from NEXT_PUBLIC_API_BASE_URL.
+ */
+export const getServerBaseUrl = () => {
+  const apiBase = getApiBaseUrl();
+  return apiBase.replace(/\/api\/?$/, '');
+};
+
+let initialBaseUrl = '';
+try {
+  initialBaseUrl = getApiBaseUrl();
+} catch (_) {
+  // At build or initialization, interceptor enforces presence before each request
+}
 
 const apiClient = axios.create({
-  baseURL: API_BASE,
+  baseURL: initialBaseUrl,
   timeout: 30000,
   headers: {
     'Content-Type': 'application/json',
   },
+});
+
+apiClient.interceptors.request.use((config) => {
+  config.baseURL = getApiBaseUrl();
+  return config;
 });
 
 export const saasApi = {
