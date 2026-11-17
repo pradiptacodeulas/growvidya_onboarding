@@ -233,7 +233,26 @@ function RegisterContent() {
       setPlans(allPlans);
 
       if (catalogRes?.data) {
-        setCatalog(catalogRes.data);
+        const activeNotifications = Array.isArray(catalogRes.data.notification_records)
+          ? catalogRes.data.notification_records.filter((n) => Number(n.status) === 1)
+          : [];
+        const activeIds = new Set(activeNotifications.map((n) => Number(n.id)));
+
+        setCatalog({
+          ...catalogRes.data,
+          notification_records: activeNotifications,
+        });
+
+        setSelectedNotifications((prev) => {
+          if (!prev || typeof prev !== 'object') return {};
+          const next = {};
+          for (const [id, cfg] of Object.entries(prev)) {
+            if (activeIds.has(Number(id))) {
+              next[id] = cfg;
+            }
+          }
+          return next;
+        });
       }
 
       // 1. Explicit URL plan_id parameter

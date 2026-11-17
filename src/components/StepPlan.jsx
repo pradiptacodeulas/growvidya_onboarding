@@ -253,7 +253,10 @@ export default function StepPlan({
   const storagePlans = catalog.storage_plans || [];
   const attendanceMachines = catalog.attendance_machines || [];
   const rfidCards = catalog.rfid_cards || [];
-  const notificationRecords = catalog.notification_records || [];
+  const notificationRecords = useMemo(
+    () => (catalog.notification_records || []).filter((n) => Number(n.status) === 1),
+    [catalog.notification_records]
+  );
 
   // Handlers for Storage
   const handleSelectStorage = (storageId) => {
@@ -1215,48 +1218,43 @@ export default function StepPlan({
           )}
 
           {/* 4. PREPAID SMS & PUSH NOTIFICATION CREDITS */}
-          <div className="border rounded-3 p-3 p-md-4 bg-light-subtle">
-            <div
-              className="d-flex align-items-center justify-content-between"
-              style={{ cursor: 'pointer' }}
-              onClick={() => toggleSection('notifications')}
-            >
-              <div className="d-flex align-items-center gap-3">
-                <div
-                  className="rounded-3 bg-info-subtle text-info d-flex align-items-center justify-content-center"
-                  style={{ width: '40px', height: '40px' }}
-                >
-                  <BellRing size={20} />
-                </div>
-                <div>
-                  <h5 className="fw-bold text-dark mb-0 fs-16">Prepaid SMS &amp; Push Notification Credits</h5>
-                  <p className="text-muted fs-13 mb-0">
-                    Metered communication credits added directly to your school wallet (credits never expire)
-                  </p>
-                </div>
-              </div>
-              <div className="d-flex align-items-center gap-2">
-                {notificationsTotal > 0 && (
-                  <span className="badge bg-info text-dark rounded-pill px-3 py-1 fs-12 fw-semibold">
-                    +₹{notificationsTotal.toLocaleString('en-IN')}
-                  </span>
-                )}
-                {collapsedSections.notifications ? (
-                  <ChevronDown size={20} className="text-muted" />
-                ) : (
-                  <ChevronUp size={20} className="text-muted" />
-                )}
-              </div>
-            </div>
-
-            {!collapsedSections.notifications && (
-              <div className="mt-4 pt-3 border-top">
-                {notificationRecords.length === 0 ? (
-                  <div className="text-center py-4 bg-white rounded-3 border text-muted">
-                    <BellRing size={28} className="text-secondary opacity-50 mb-2" />
-                    <p className="mb-0 fs-13">No notification credit packs currently listed in catalog.</p>
+          {notificationRecords.length != 0 && (
+            <div className="border rounded-3 p-3 p-md-4 bg-light-subtle">
+              <div
+                className="d-flex align-items-center justify-content-between"
+                style={{ cursor: 'pointer' }}
+                onClick={() => toggleSection('notifications')}
+              >
+                <div className="d-flex align-items-center gap-3">
+                  <div
+                    className="rounded-3 bg-info-subtle text-info d-flex align-items-center justify-content-center"
+                    style={{ width: '40px', height: '40px' }}
+                  >
+                    <BellRing size={20} />
                   </div>
-                ) : (
+                  <div>
+                    <h5 className="fw-bold text-dark mb-0 fs-16">Prepaid SMS &amp; Push Notification Credits</h5>
+                    <p className="text-muted fs-13 mb-0">
+                      Metered communication credits added directly to your school wallet (credits never expire)
+                    </p>
+                  </div>
+                </div>
+                <div className="d-flex align-items-center gap-2">
+                  {notificationsTotal > 0 && (
+                    <span className="badge bg-info text-dark rounded-pill px-3 py-1 fs-12 fw-semibold">
+                      +₹{notificationsTotal.toLocaleString('en-IN')}
+                    </span>
+                  )}
+                  {collapsedSections.notifications ? (
+                    <ChevronDown size={20} className="text-muted" />
+                  ) : (
+                    <ChevronUp size={20} className="text-muted" />
+                  )}
+                </div>
+              </div>
+
+              {!collapsedSections.notifications && (
+                <div className="mt-4 pt-3 border-top">
                   <div className="row g-3">
                     {notificationRecords.map((n) => {
                       const minQty = Math.max(1, parseInt(n.min_qty, 10) || 1);
@@ -1274,7 +1272,7 @@ export default function StepPlan({
                           >
                             <div className="d-flex align-items-center justify-content-between mb-1">
                               <span className="fw-bold fs-15 text-dark text-capitalize">
-                                {n.pack_name || n.name || `${n.type || n.channel} Credits`}
+                                {n.pack_name || n.name}
                               </span>
                               <div className="form-check form-switch mb-0">
                                 <input
@@ -1291,9 +1289,11 @@ export default function StepPlan({
                             <div className="text-muted fs-11 mb-2">
                               Min. {minQty.toLocaleString('en-IN')} credits
                             </div>
-                            <p className="text-muted fs-12 mb-2">
-                              {n.message || 'Prepaid institutional communication credits'}
-                            </p>
+                            {n.message && (
+                              <p className="text-muted fs-12 mb-2">
+                                {n.message}
+                              </p>
+                            )}
                             <div className="d-flex align-items-baseline gap-2 mb-3">
                               <span className="fs-16 fw-bold text-info">₹{cost.toFixed(2)}</span>
                               <span className="text-muted fs-12">/ credit</span>
@@ -1338,10 +1338,10 @@ export default function StepPlan({
                       );
                     })}
                   </div>
-                )}
-              </div>
-            )}
-          </div>
+                </div>
+              )}
+            </div>
+          )}
         </div>
       </div>
       {/* END LEFT COLUMN */}

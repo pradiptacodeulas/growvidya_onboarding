@@ -64,7 +64,10 @@ export default function StepReview({
   const storagePlans = catalog?.storage_plans || [];
   const attendanceMachines = catalog?.attendance_machines || [];
   const rfidCards = catalog?.rfid_cards || [];
-  const notificationRecords = catalog?.notification_records || [];
+  const notificationRecords = useMemo(
+    () => (catalog?.notification_records || []).filter((n) => Number(n.status) === 1),
+    [catalog?.notification_records]
+  );
 
   const effectiveStorageCycle = isPureFreeOrTrial ? 'annual' : cycle || 'annual';
   const selectedStorage =
