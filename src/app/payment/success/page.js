@@ -128,7 +128,12 @@ function OnboardingPaymentSuccessContent() {
   const schoolPhone = order?.school?.phone || '';
   const schoolAddress = order?.school?.address || order?.shipping_address || '';
 
-  const portalLaunchUrl = portalUrl;
+  const cleanPortalBase = portalUrl ? portalUrl.replace(/\/+$/, '') : '';
+  const portalLaunchUrl = cleanPortalBase
+    ? handoverToken
+      ? `${cleanPortalBase}/auth/callback?token=${encodeURIComponent(handoverToken)}`
+      : `${cleanPortalBase}/account/login/adminlogin`
+    : '';
 
   const lineItems =
     Array.isArray(order?.line_items) && order.line_items.length > 0

@@ -7,6 +7,8 @@ import {
   Users,
   Building2,
   HardDrive,
+  MessageSquare,
+  BellRing,
   ShieldCheck,
   ArrowRight,
   Loader2,
@@ -198,6 +200,12 @@ export default function PricingCatalog() {
                     : 0);
                 const trialDays = Math.max(0, parseInt(plan.free_trial_days, 10) || 0);
                 const includedStorageGb = Math.max(0, parseInt(plan.included_storage_gb, 10) || 0);
+                const includedSmsCredits = Math.max(0, parseInt(plan.included_sms_credits, 10) || 0);
+                const includedPushCredits = Math.max(0, parseInt(plan.included_push_credits, 10) || 0);
+                const hasFreeTrial =
+                  trialDays > 0 ||
+                  String(plan.billing_cycle || '').trim().toLowerCase() === 'trial' ||
+                  priceNum <= 0;
                 const maxStudents = Number(plan.max_students) || 0;
                 const maxTeachers =
                   plan.max_teachers !== undefined && plan.max_teachers !== null
@@ -335,6 +343,24 @@ export default function PricingCatalog() {
                             </li>
                           )}
 
+                          {includedSmsCredits > 0 && (
+                            <li className="d-flex align-items-center gap-2 text-dark">
+                              <MessageSquare size={16} className="text-primary flex-shrink-0" />
+                              <span>
+                                <strong>{includedSmsCredits.toLocaleString('en-IN')}</strong> SMS Credits Included
+                              </span>
+                            </li>
+                          )}
+
+                          {includedPushCredits > 0 && (
+                            <li className="d-flex align-items-center gap-2 text-dark">
+                              <BellRing size={16} className="text-primary flex-shrink-0" />
+                              <span>
+                                <strong>{includedPushCredits.toLocaleString('en-IN')}</strong> Push Notification Credits
+                              </span>
+                            </li>
+                          )}
+
                           {planItems.map((item) => (
                             <li
                               key={item.id || item.item_code}
@@ -356,16 +382,26 @@ export default function PricingCatalog() {
                           ))}
                         </ul>
 
-                        {/* Select Button */}
+                        {/* Action Button: Show ONLY Free Trial button when free_trial_days > 0, else Paid button */}
                         <div className="mt-auto pt-2">
                           <button
                             type="button"
                             onClick={() => handleSelectPlan(plan)}
                             className={`btn w-100 py-2 fw-semibold d-flex align-items-center justify-content-center gap-2 ${
-                              isPopular ? 'btn-primary shadow-sm' : 'btn-outline-primary'
+                              hasFreeTrial
+                                ? 'btn-success shadow-sm'
+                                : isPopular
+                                ? 'btn-primary shadow-sm'
+                                : 'btn-outline-primary'
                             }`}
                           >
-                            <span>Select {plan.plan_name}</span>
+                            <span>
+                              {hasFreeTrial
+                                ? trialDays > 0
+                                  ? `Start ${trialDays}-Day Free Trial`
+                                  : 'Start Free Trial'
+                                : `Select ${plan.plan_name}`}
+                            </span>
                             <ArrowRight size={16} />
                           </button>
                         </div>
