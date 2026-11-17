@@ -282,7 +282,6 @@ function RegisterContent() {
       setPlans(allPlans);
 
       if (catalogRes?.data) {
-<<<<<<< HEAD
         const activeNotifications = Array.isArray(catalogRes.data.notification_records)
           ? catalogRes.data.notification_records.filter((n) => Number(n.status) === 1)
           : [];
@@ -303,9 +302,6 @@ function RegisterContent() {
           }
           return next;
         });
-=======
-        setCatalog(fetchedCatalog);
->>>>>>> 34a059f864995c17edd3b741ec11aa63009b6d6f
       }
 
       const resolveInitialTrialFlag = (planObj, activeCouponObj) => {
