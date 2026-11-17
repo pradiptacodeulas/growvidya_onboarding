@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import Link from 'next/link';
 import {
   Check,
@@ -114,8 +114,7 @@ export default function StepPlan({
     if (current && current !== 'trial' && availableCycles.some((c) => c.cycle === current)) {
       return current;
     }
-    const annualMatch = availableCycles.find((c) => c.cycle === 'annual');
-    return annualMatch ? annualMatch.cycle : availableCycles[0]?.cycle || '';
+    return availableCycles[0]?.cycle || '';
   }, [billingCycle, selectedPlan?.billing_cycle, availableCycles]);
 
   const plansForActiveCycle = useMemo(() => {
@@ -138,14 +137,16 @@ export default function StepPlan({
     if (setBillingCycle && planCycle) {
       setBillingCycle(planCycle);
     }
-    const trialFlag = appliedCoupon
-      ? false
-      : Boolean(
-        activateAsTrial ||
-        planCycle === 'trial' ||
-        parseFloat(plan.price) <= 0 ||
-        parseInt(plan.free_trial_days, 10) > 0
-      );
+    const planSupportsTrial =
+      planCycle === 'trial' ||
+      parseFloat(plan.price) <= 0 ||
+      parseInt(plan.free_trial_days, 10) > 0;
+    const couponScope = String(
+      appliedCoupon?.applicable_scope || appliedCoupon?.applicableScope || ''
+    ).toLowerCase();
+    const isPlanOnlyCoupon = Boolean(appliedCoupon && (!couponScope || couponScope === 'plan_only'));
+    const trialFlag = isPlanOnlyCoupon ? false : Boolean(activateAsTrial && planSupportsTrial);
+
     if (setIsTrialMode) {
       setIsTrialMode(trialFlag);
     }
@@ -175,8 +176,28 @@ export default function StepPlan({
           candidates.find((p) => Number(p.is_popular) === 1) ||
           candidates[0];
         if (sameGroupOrRank && setSelectedPlan) {
+          const nextPlanCycle = String(sameGroupOrRank.billing_cycle || '').toLowerCase();
+          const nextSupportsTrial =
+            nextPlanCycle === 'trial' ||
+            parseFloat(sameGroupOrRank.price) <= 0 ||
+            parseInt(sameGroupOrRank.free_trial_days, 10) > 0;
+          const couponScope = String(
+            appliedCoupon?.applicable_scope || appliedCoupon?.applicableScope || ''
+          ).toLowerCase();
+          const isPlanOnlyCoupon = Boolean(
+            appliedCoupon && (!couponScope || couponScope === 'plan_only')
+          );
+          const nextTrialFlag = isPlanOnlyCoupon ? false : nextSupportsTrial;
+
           setSelectedPlan(sameGroupOrRank);
-          if (setIsTrialMode) setIsTrialMode(false);
+          if (setIsTrialMode) setIsTrialMode(nextTrialFlag);
+          if (typeof window !== 'undefined') {
+            const url = new URL(window.location.href);
+            url.searchParams.set('plan_id', String(sameGroupOrRank.id));
+            if (nextPlanCycle) url.searchParams.set('cycle', nextPlanCycle);
+            url.searchParams.set('trial', nextTrialFlag ? '1' : '0');
+            window.history.replaceState({}, '', url.toString());
+          }
         }
       }
     }
@@ -232,9 +253,12 @@ export default function StepPlan({
 
   const trialDays = Math.max(0, parseInt(selectedPlan.free_trial_days, 10) || 0);
   const includedStorageGb = Math.max(0, parseInt(selectedPlan.included_storage_gb, 10) || 0);
+  const includedSmsCredits = Math.max(0, parseInt(selectedPlan.included_sms_credits, 10) || 0);
+  const includedPushCredits = Math.max(0, parseInt(selectedPlan.included_push_credits, 10) || 0);
   const basePrice = parseFloat(selectedPlan.price || 0);
   const isPureTrialPlan =
     String(selectedPlan.billing_cycle || '').toLowerCase() === 'trial' || basePrice <= 0;
+  const hasTrialOption = isPureTrialPlan || trialDays > 0;
   const cycle = String(selectedPlan.billing_cycle || billingCycle || '').toLowerCase();
   const cycleMeta = selectedPlan.cycle_meta || {
     cycle,
@@ -243,9 +267,11 @@ export default function StepPlan({
     durationText: '',
   };
 
-  // Storage add-on cycle aligns with selected paid cycle, or annual when on free trial
-  const effectiveStorageCycle =
-    isPureTrialPlan || isTrialMode ? activePaidCycle || 'annual' : cycle || 'annual';
+  // Storage add-on cycle strictly follows selectedPlan.billing_cycle on paid plans (even during free trial),
+  // or the dynamically selected paid cycle from availableCycles on pure trial plans (zero hardcoded cycles).
+  const effectiveStorageCycle = isPureTrialPlan
+    ? activePaidCycle
+    : cycle || activePaidCycle;
   const storageCycleMeta =
     availableCycles.find((c) => c.cycle === effectiveStorageCycle) || cycleMeta;
 
@@ -487,9 +513,10 @@ export default function StepPlan({
     }, 0);
   }, [selectedNotifications, notificationRecords]);
 
+  const isEffectiveTrial = isPureTrialPlan || Boolean(isTrialMode);
   const addonsTotal =
     Math.round((storagePrice + machinesTotal + cardsTotal + notificationsTotal) * 100) / 100;
-  const effectiveBasePrice = isPureTrialPlan ? 0 : basePrice;
+  const effectiveBasePrice = isEffectiveTrial ? 0 : basePrice;
   const subtotalAmount = Math.round((effectiveBasePrice + addonsTotal) * 100) / 100;
 
   const computeScopedDiscount = (planAmt) => {
@@ -540,12 +567,24 @@ export default function StepPlan({
   const discountAmount = computeScopedDiscount(effectiveBasePrice);
   const grandTotal = Math.max(0, Math.round((subtotalAmount - discountAmount) * 100) / 100);
 
+  useEffect(() => {
+    if (appliedCoupon && discountAmount <= 0) {
+      const codeToRelease = appliedCoupon.code;
+      if (setAppliedCoupon) setAppliedCoupon(null);
+      if (setIsTrialMode) setIsTrialMode(Boolean(hasTrialOption));
+      setCouponError('Coupon removed because cart items no longer meet coupon requirements.');
+      if (codeToRelease) {
+        saasApi.removeCoupon({ code: codeToRelease }).catch(() => {});
+      }
+    }
+  }, [appliedCoupon, discountAmount, hasTrialOption, setAppliedCoupon, setIsTrialMode]);
+
   const handleApplyCoupon = async () => {
     if (!couponCode || !couponCode.trim()) return;
     try {
       setValidatingCoupon(true);
       setCouponError('');
-      const activePlanAmt = effectiveBasePrice;
+      const activePlanAmt = isPureTrialPlan ? 0 : basePrice;
       const activeSub = Math.round((activePlanAmt + addonsTotal) * 100) / 100;
 
       const res = await saasApi.validateCoupon({
@@ -558,8 +597,30 @@ export default function StepPlan({
       });
 
       if (res?.data) {
-        if (setAppliedCoupon) setAppliedCoupon(res.data);
-        if (setIsTrialMode) setIsTrialMode(false);
+        const couponData = res.data;
+        const scope = String(
+          couponData.applicable_scope || couponData.applicableScope || 'plan_only'
+        ).toLowerCase();
+        const addonEligible =
+          scope === 'all'
+            ? addonsTotal
+            : scope === 'software_and_storage'
+            ? storagePrice
+            : 0;
+        const minOrder = parseFloat(
+          couponData.min_order_amount ?? couponData.minOrderAmount ?? 0
+        );
+        const qualifiesInTrialMode =
+          hasTrialOption && addonEligible > 0 && (minOrder <= 0 || addonEligible >= minOrder);
+
+        if (setAppliedCoupon) setAppliedCoupon(couponData);
+        if (setIsTrialMode) {
+          if (isPureTrialPlan || qualifiesInTrialMode) {
+            setIsTrialMode(true);
+          } else {
+            setIsTrialMode(false);
+          }
+        }
       } else {
         setCouponError(res?.message || 'Invalid coupon code.');
       }
@@ -575,7 +636,7 @@ export default function StepPlan({
     if (setAppliedCoupon) setAppliedCoupon(null);
     if (setCouponCode) setCouponCode('');
     setCouponError('');
-    if (setIsTrialMode) setIsTrialMode(true);
+    if (setIsTrialMode) setIsTrialMode(Boolean(hasTrialOption));
     if (codeToRelease) {
       try {
         await saasApi.removeCoupon({ code: codeToRelease });
@@ -719,26 +780,34 @@ export default function StepPlan({
               </div>
             )}
 
-            {smsItem && (
+            {(includedSmsCredits > 0 || smsItem) && (
               <div className="col-sm-6 col-lg-3">
                 <div className="p-3 bg-light rounded-3 border h-100">
                   <div className="d-flex align-items-center gap-2 mb-1">
                     <MessageSquare size={18} className="text-info" />
-                    <span className="fs-12 text-muted fw-semibold">SMS Gateway</span>
+                    <span className="fs-12 text-muted fw-semibold">SMS Credits</span>
                   </div>
-                  <div className="fs-16 fw-bold text-dark">{smsItem.item_name}</div>
+                  <div className="fs-16 fw-bold text-dark">
+                    {includedSmsCredits > 0
+                      ? `${includedSmsCredits.toLocaleString('en-IN')} Included`
+                      : smsItem.item_name}
+                  </div>
                 </div>
               </div>
             )}
 
-            {pushItem && (
+            {(includedPushCredits > 0 || pushItem) && (
               <div className="col-sm-6 col-lg-3">
                 <div className="p-3 bg-light rounded-3 border h-100">
                   <div className="d-flex align-items-center gap-2 mb-1">
                     <BellRing size={18} className="text-warning" />
-                    <span className="fs-12 text-muted fw-semibold">Push Notifications</span>
+                    <span className="fs-12 text-muted fw-semibold">Push Credits</span>
                   </div>
-                  <div className="fs-16 fw-bold text-dark">{pushItem.item_name}</div>
+                  <div className="fs-16 fw-bold text-dark">
+                    {includedPushCredits > 0
+                      ? `${includedPushCredits.toLocaleString('en-IN')} Included`
+                      : pushItem.item_name}
+                  </div>
                 </div>
               </div>
             )}
@@ -847,6 +916,30 @@ export default function StepPlan({
                   </div>
                 ) : (
                   <>
+                    {isPureTrialPlan && availableCycles.length > 1 && (
+                      <div className="d-flex flex-wrap align-items-center justify-content-between gap-2 mb-3 pb-2 border-bottom">
+                        <span className="fs-12 fw-semibold text-muted">
+                          Select Cloud Storage Billing Cycle:
+                        </span>
+                        <div className="d-inline-flex flex-wrap gap-1 bg-white p-1 rounded-pill border">
+                          {availableCycles.map((cyc) => {
+                            const isActive = cyc.cycle === effectiveStorageCycle;
+                            return (
+                              <button
+                                key={cyc.cycle}
+                                type="button"
+                                onClick={() => setBillingCycle && setBillingCycle(cyc.cycle)}
+                                className={`btn btn-sm rounded-pill px-3 py-1 fs-12 fw-semibold ${
+                                  isActive ? 'btn-primary text-white' : 'btn-white text-secondary'
+                                }`}
+                              >
+                                {cyc.label}
+                              </button>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    )}
                     <div className="row g-3">
                       {storagePlans.map((st) => {
                         const isSelected = Number(selectedStorageId) === Number(st.id);
@@ -1373,8 +1466,13 @@ export default function StepPlan({
                 </div>
               </div>
               <div className="text-end flex-shrink-0">
-                {isPureTrialPlan ? (
+                {isEffectiveTrial ? (
                   <div>
+                    {!isPureTrialPlan && basePrice > 0 && (
+                      <span className="text-muted text-decoration-line-through fs-12 me-1">
+                        ₹{basePrice.toLocaleString('en-IN')}
+                      </span>
+                    )}
                     <span className="fw-bold text-success fs-14">₹0.00</span>
                     <div className="badge bg-success-subtle text-success fs-10 px-2 py-1 d-block mt-1">
                       Free Trial
@@ -1385,11 +1483,6 @@ export default function StepPlan({
                     <span className="fw-bold text-dark fs-14">
                       ₹{basePrice.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
                     </span>
-                    {(isTrialMode || trialDays > 0) && (
-                      <div className="badge bg-success-subtle text-success fs-10 px-2 py-1 d-block mt-1">
-                        Free Trial
-                      </div>
-                    )}
                   </div>
                 )}
               </div>
@@ -1510,7 +1603,7 @@ export default function StepPlan({
           </div>
 
           {/* Coupon Code Input in Order Summary */}
-          {(effectiveBasePrice > 0 || addonsTotal > 0) && (
+          {(!isPureTrialPlan || addonsTotal > 0) && (
             <div className="mb-3 pt-2 border-top">
               <label className="form-label fs-12 fw-bold text-dark d-flex align-items-center gap-1 mb-1">
                 <Tag size={13} className="text-primary" />
@@ -1611,7 +1704,7 @@ export default function StepPlan({
           </div>
 
           {/* Free trial notification note */}
-          {(isTrialMode || isPureTrialPlan) && !appliedCoupon && grandTotal === 0 && (
+          {isEffectiveTrial && grandTotal === 0 && (
             <div className="p-3 rounded-3 bg-success-subtle text-success border border-success-subtle fs-12 mb-3 d-flex align-items-center gap-2">
               <ShieldCheck size={16} className="flex-shrink-0" />
               <span>
@@ -1629,7 +1722,11 @@ export default function StepPlan({
               onClick={onNext}
             >
               <span>
-                Continue: {trialDays > 0 ? `for ${trialDays} days ` : ''}Free Trial
+                {isEffectiveTrial
+                  ? grandTotal > 0
+                    ? `Continue: ${trialDays > 0 ? `${trialDays}-Day ` : ''}Free Trial (+₹${grandTotal.toLocaleString('en-IN')})`
+                    : `Continue: ${trialDays > 0 ? `for ${trialDays} days ` : ''}Free Trial`
+                  : `Continue to School Profile (₹${grandTotal.toLocaleString('en-IN')})`}
               </span>
               <ArrowRight size={16} />
             </button>

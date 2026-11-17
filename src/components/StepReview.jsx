@@ -20,7 +20,9 @@ const DRAFT_STORAGE_KEY = 'growvidya_onboarding_draft';
 const RESULT_STORAGE_KEY = 'growvidya_onboarding_result';
 
 export default function StepReview({
+  plans = [],
   selectedPlan,
+  billingCycle = '',
   catalog = {},
   selectedStorageId = null,
   selectedMachines = {},
@@ -69,7 +71,32 @@ export default function StepReview({
     [catalog?.notification_records]
   );
 
-  const effectiveStorageCycle = isPureFreeOrTrial ? 'annual' : cycle || 'annual';
+  const availableCycles = useMemo(() => {
+    const map = new Map();
+    plans.forEach((p) => {
+      const c = String(p.billing_cycle || '').toLowerCase();
+      if (c && c !== 'trial' && parseFloat(p.price) > 0 && !map.has(c) && p.cycle_meta) {
+        map.set(c, { ...p.cycle_meta, cycle: p.cycle_meta.cycle || p.cycle_meta.code || c });
+      }
+    });
+    return Array.from(map.values()).sort(
+      (a, b) => (a.rank ?? a.months ?? 0) - (b.rank ?? b.months ?? 0)
+    );
+  }, [plans]);
+
+  const activePaidCycle = useMemo(() => {
+    const current = String(billingCycle || selectedPlan?.billing_cycle || '').toLowerCase();
+    if (current && current !== 'trial' && availableCycles.some((c) => c.cycle === current)) {
+      return current;
+    }
+    return availableCycles[0]?.cycle || '';
+  }, [billingCycle, selectedPlan?.billing_cycle, availableCycles]);
+
+  const effectiveStorageCycle = isPureFreeOrTrial
+    ? activePaidCycle
+    : cycle || activePaidCycle;
+  const storageCycleMeta =
+    availableCycles.find((c) => c.cycle === effectiveStorageCycle) || cycleMeta;
   const selectedStorage =
     storagePlans.find((s) => Number(s.id) === Number(selectedStorageId)) || null;
   const storagePrice = selectedStorage
@@ -195,9 +222,10 @@ export default function StepReview({
   const trialDiscountAmount = computeScopedDiscount(0);
   const trialPayable = Math.max(0, Math.round((addonsTotal - trialDiscountAmount) * 100) / 100);
 
-  const displaySubtotal = isPureFreeOrTrial ? addonsTotal : paidSubtotal;
-  const displayDiscount = isPureFreeOrTrial ? trialDiscountAmount : paidDiscountAmount;
-  const displayFinalAmount = isPureFreeOrTrial ? trialPayable : finalPaidAmount;
+  const isEffectiveTrial = isPureFreeOrTrial || Boolean(isTrialMode);
+  const displaySubtotal = isEffectiveTrial ? addonsTotal : paidSubtotal;
+  const displayDiscount = isEffectiveTrial ? trialDiscountAmount : paidDiscountAmount;
+  const displayFinalAmount = isEffectiveTrial ? trialPayable : finalPaidAmount;
 
   const handleApplyCoupon = async () => {
     if (!couponCode.trim()) return;
@@ -217,8 +245,32 @@ export default function StepReview({
       });
 
       if (res?.data) {
-        if (setAppliedCoupon) setAppliedCoupon(res.data);
-        if (setIsTrialMode) setIsTrialMode(false);
+        const couponData = res.data;
+        const scope = String(
+          couponData.applicable_scope || couponData.applicableScope || 'plan_only'
+        ).toLowerCase();
+        const addonEligible =
+          scope === 'all'
+            ? addonsTotal
+            : scope === 'software_and_storage'
+            ? storagePrice
+            : 0;
+        const minOrder = parseFloat(
+          couponData.min_order_amount ?? couponData.minOrderAmount ?? 0
+        );
+        const qualifiesInTrialMode =
+          (hasTrialOption || isPureFreeOrTrial) &&
+          addonEligible > 0 &&
+          (minOrder <= 0 || addonEligible >= minOrder);
+
+        if (setAppliedCoupon) setAppliedCoupon(couponData);
+        if (setIsTrialMode) {
+          if (isPureFreeOrTrial || qualifiesInTrialMode) {
+            setIsTrialMode(true);
+          } else {
+            setIsTrialMode(false);
+          }
+        }
       } else {
         setCouponError(res?.message || 'Invalid coupon code.');
       }
@@ -279,7 +331,7 @@ export default function StepReview({
     if (setAppliedCoupon) setAppliedCoupon(null);
     if (setCouponCode) setCouponCode('');
     setCouponError('');
-    if (setIsTrialMode && hasTrialOption) setIsTrialMode(true);
+    if (setIsTrialMode) setIsTrialMode(Boolean(hasTrialOption || isPureFreeOrTrial));
     if (codeToRelease) {
       try {
         await saasApi.removeCoupon({ code: codeToRelease });
@@ -288,7 +340,6 @@ export default function StepReview({
   };
 
   const buildRegistrationPayload = (orderData, paymentProof = {}, isTrialAction = false) => {
-    const trialStorageCycle = isTrialAction || isPureFreeOrTrial ? 'annual' : cycle || 'annual';
     return {
       plan_id: selectedPlan.id,
       is_trial: isTrialAction,
@@ -296,7 +347,7 @@ export default function StepReview({
       payment_order_id: orderData?.payment_order_id || null,
       storage_plan_id: selectedStorageId || null,
       storage_qty: selectedStorageId ? 1 : 0,
-      storage_billing_cycle: trialStorageCycle,
+      storage_billing_cycle: effectiveStorageCycle,
       selected_machines: machinesList.map((m) => ({ id: Number(m.id), quantity: Number(m.quantity) })),
       selected_cards: cardsList.map((c) => ({ id: Number(c.id), quantity: Number(c.quantity) })),
       selected_notifications: notificationsList.map((n) => ({
@@ -307,7 +358,8 @@ export default function StepReview({
       shipping_address: hasPhysicalHardware
         ? resolvedShippingAddress.trim()
         : campusContactData?.address || null,
-      coupon_code: appliedCoupon ? appliedCoupon.code : null,
+      coupon_code:
+        appliedCoupon && (!isTrialAction || trialDiscountAmount > 0) ? appliedCoupon.code : null,
       school: {
         school_name: schoolProfileData.school_name,
         school_code: schoolProfileData.school_code || null,
@@ -448,36 +500,16 @@ export default function StepReview({
         }
       }
 
-      // 3. Create verified server-side checkout order intent (Zero GST)
+      // 3. Create verified server-side checkout order intent (Zero GST) with full onboarding snapshot
       setStatusMessage('Preparing verified subscription order...');
-      const trialStorageCycle = isTrialAction || isPureFreeOrTrial ? 'annual' : cycle || 'annual';
+      const preOrderRegPayload = buildRegistrationPayload(null, {}, isTrialAction);
       const orderRes = await saasApi.createOrder({
-        plan_id: selectedPlan.id,
-        is_trial: isTrialAction,
-        storage_plan_id: selectedStorageId || null,
-        storage_qty: selectedStorageId ? 1 : 0,
-        storage_billing_cycle: trialStorageCycle,
-        selected_machines: machinesList.map((m) => ({ id: Number(m.id), quantity: Number(m.quantity) })),
-        selected_cards: cardsList.map((c) => ({ id: Number(c.id), quantity: Number(c.quantity) })),
-        selected_notifications: notificationsList.map((n) => ({
-          id: Number(n.id),
-          quantity: Number(n.quantity),
-          type: n.type || n.channel,
-        })),
-        coupon_code: appliedCoupon ? appliedCoupon.code : null,
-        shipping_address: hasPhysicalHardware
-          ? resolvedShippingAddress.trim()
-          : campusContactData.address || null,
+        ...preOrderRegPayload,
         school_name: schoolProfileData.school_name,
         admin_email: adminData.email,
         admin_phone: adminData.phone,
         school_email: campusContactData.email,
         school_phone: campusContactData.phone_number,
-        school: {
-          school_name: schoolProfileData.school_name,
-          school_code: schoolProfileData.school_code || null,
-          address: campusContactData.address || null,
-        },
       });
 
       const orderData = orderRes?.data || orderRes;
@@ -492,8 +524,18 @@ export default function StepReview({
         throw new Error(orderRes?.message || 'Failed to initialize payment order with gateway.');
       }
 
+      if (typeof window !== 'undefined' && !window.Razorpay) {
+        await new Promise((resolve) => {
+          const script = document.createElement('script');
+          script.src = 'https://checkout.razorpay.com/v1/checkout.js';
+          script.onload = () => resolve(true);
+          script.onerror = () => resolve(false);
+          document.body.appendChild(script);
+        });
+      }
+
       if (typeof window === 'undefined' || !window.Razorpay) {
-        throw new Error('Payment gateway SDK is still loading. Please try again in a moment.');
+        throw new Error('Payment gateway SDK could not be loaded. Please check your internet connection and try again.');
       }
 
       setStatusMessage('Waiting for Razorpay payment authorization...');
@@ -573,7 +615,7 @@ export default function StepReview({
             const failureDraftSnapshot = {
               currentStep: 5,
               selectedPlanId: selectedPlan?.id || null,
-              billingCycle: selectedPlan?.billing_cycle || '',
+              billingCycle: effectiveStorageCycle || selectedPlan?.billing_cycle || '',
               isTrialMode: isTrialAction,
               selectedStorageId,
               selectedMachines,
@@ -938,10 +980,12 @@ export default function StepReview({
                 <div className="d-flex justify-content-between text-dark">
                   <span>
                     Base Platform License ({selectedPlan?.plan_name}
-                    {isPureFreeOrTrial ? ' — Free Trial' : ` — ${cycleMeta.label}`}):
+                    {isEffectiveTrial
+                      ? ` — ${trialDays > 0 ? `${trialDays}-Day ` : ''}Free Trial`
+                      : ` — ${cycleMeta.label}`}):
                   </span>
                   <span className="fw-semibold">
-                    {isPureFreeOrTrial || basePrice <= 0
+                    {isEffectiveTrial || basePrice <= 0
                       ? '₹0.00'
                       : `₹${Number(basePrice).toLocaleString('en-IN', { minimumFractionDigits: 2 })}`}
                   </span>
@@ -951,7 +995,7 @@ export default function StepReview({
                   <div className="d-flex justify-content-between text-dark">
                     <span>
                       Cloud Storage Expansion ({selectedStorage.plan_name} — +{selectedStorage.storage_capacity}{' '}
-                      {selectedStorage.unit_code || 'GB'}):
+                      {selectedStorage.unit_code || 'GB'}, {storageCycleMeta.label || effectiveStorageCycle}):
                     </span>
                     <span className="fw-semibold">
                       +₹{Number(storagePrice).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
@@ -1055,7 +1099,11 @@ export default function StepReview({
             <>
               <button
                 type="button"
-                className="btn btn-outline-primary px-4 py-2 fw-semibold fs-14 shadow-sm"
+                className={`btn ${
+                  !isEffectiveTrial
+                    ? 'btn-primary shadow-sm'
+                    : 'btn-outline-primary'
+                } px-4 py-2 fw-semibold fs-14`}
                 onClick={() => executeOnboardingCheckout(false)}
                 disabled={submitting}
               >
@@ -1065,15 +1113,21 @@ export default function StepReview({
                     <span>Processing...</span>
                   </span>
                 ) : finalPaidAmount <= 0 ? (
-                  `Activate ${selectedPlan?.plan_name} Now (₹0)`
+                  `Activate ${selectedPlan?.plan_name} Full Plan (₹0)`
+                ) : addonsTotal > 0 ? (
+                  `Pay ₹${Number(finalPaidAmount).toLocaleString('en-IN')} & Activate Full Plan + Add-ons`
                 ) : (
-                  `Pay ₹${Number(finalPaidAmount).toLocaleString('en-IN')} & Activate`
+                  `Pay ₹${Number(finalPaidAmount).toLocaleString('en-IN')} & Activate Full Plan`
                 )}
               </button>
 
               <button
                 type="button"
-                className="btn btn-success px-4 py-2 fw-semibold fs-14"
+                className={`btn ${
+                  isEffectiveTrial
+                    ? 'btn-success shadow-sm'
+                    : 'btn-outline-success'
+                } px-4 py-2 fw-semibold fs-14`}
                 onClick={() => executeOnboardingCheckout(true)}
                 disabled={submitting}
               >
@@ -1088,12 +1142,11 @@ export default function StepReview({
                   `Start ${trialDays}-Day Free Trial (₹0)`
                 )}
               </button>
-
             </>
           ) : isPureFreeOrTrial ? (
             <button
               type="button"
-              className="btn btn-primary px-4 py-2 fw-semibold fs-14 shadow-sm"
+              className="btn btn-success px-4 py-2 fw-semibold fs-14 shadow-sm"
               onClick={() => executeOnboardingCheckout(true)}
               disabled={submitting}
             >
@@ -1103,9 +1156,9 @@ export default function StepReview({
                   <span>Activating...</span>
                 </span>
               ) : trialPayable > 0 ? (
-                `Activate Free Trial & Pay ₹${Number(trialPayable).toLocaleString('en-IN')} Add-ons`
+                `Start ${trialDays > 0 ? `${trialDays}-Day ` : ''}Free Trial (Pay ₹${Number(trialPayable).toLocaleString('en-IN')} Add-ons)`
               ) : trialDays > 0 ? (
-                `Activate ${trialDays}-Day Free Trial (₹0)`
+                `Start ${trialDays}-Day Free Trial (₹0)`
               ) : (
                 'Activate Free Plan (₹0)'
               )}

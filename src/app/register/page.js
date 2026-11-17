@@ -24,6 +24,20 @@ const STEPS = [
 
 const DRAFT_STORAGE_KEY = 'growvidya_onboarding_draft';
 
+function parsePairsParam(raw) {
+  const result = {};
+  if (!raw || typeof raw !== 'string') return result;
+  raw.split(',').forEach((entry) => {
+    const [idStr, qtyStr] = entry.split(':');
+    const id = parseInt(idStr, 10);
+    const qty = parseInt(qtyStr, 10);
+    if (!Number.isNaN(id) && id > 0 && !Number.isNaN(qty) && qty > 0) {
+      result[id] = qty;
+    }
+  });
+  return result;
+}
+
 function RegisterContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -32,6 +46,12 @@ function RegisterContent() {
   const trialRawParam = searchParams.get('trial');
   const trialParam = trialRawParam === null ? true : trialRawParam === '1' || trialRawParam === 'true';
   const resumeParam = searchParams.get('resume') || '';
+  const storageIdParam = searchParams.get('storage_id') || '';
+  const machinesParam = searchParams.get('machines') || '';
+  const cardsParam = searchParams.get('cards') || '';
+  const notificationsParam = searchParams.get('notifications') || '';
+  const couponParam = searchParams.get('coupon') || '';
+  const shippingParam = searchParams.get('shipping_address') || '';
 
   const [currentStep, setCurrentStep] = useState(0);
   const [loading, setLoading] = useState(true);
@@ -166,57 +186,85 @@ function RegisterContent() {
 
   const initializeWizard = async () => {
     let savedDraft = null;
+    const isExplicitResume = resumeParam === 'review' || resumeParam === 'plan';
+
     if (typeof window !== 'undefined') {
       try {
-        const navEntry = window.performance?.getEntriesByType?.('navigation')?.[0];
-        const isReload =
-          navEntry?.type === 'reload' || window.performance?.navigation?.type === 1;
-        const isValidResume =
-          (resumeParam === 'review' || resumeParam === 'plan') && !isReload;
+        const raw = sessionStorage.getItem(DRAFT_STORAGE_KEY);
+        if (raw) {
+          savedDraft = JSON.parse(raw);
+        }
 
-        if (isValidResume) {
-          const raw = sessionStorage.getItem(DRAFT_STORAGE_KEY);
-          if (raw) savedDraft = JSON.parse(raw);
-          sessionStorage.removeItem(DRAFT_STORAGE_KEY);
-
-          // Strip ?resume=... from URL so a subsequent refresh resets cleanly
+        if (isExplicitResume) {
           const cleanUrl = new URL(window.location.href);
           cleanUrl.searchParams.delete('resume');
           window.history.replaceState({}, '', cleanUrl.toString());
-        } else {
-          sessionStorage.removeItem(DRAFT_STORAGE_KEY);
-          resetFormStatesToDefault();
         }
       } catch (e) {
         console.warn('Could not manage onboarding draft in sessionStorage:', e);
       }
     }
 
-    // If accessed directly without a selected plan_id and without a saved resume draft, redirect to Pricing Page
+    // If accessed directly without a selected plan_id and without a saved draft, redirect to Pricing Page
     if (!planIdParam && !savedDraft?.selectedPlanId) {
       router.replace('/');
       return;
     }
 
+    const isSamePlanDraft =
+      savedDraft &&
+      (!planIdParam || String(savedDraft.selectedPlanId) === String(planIdParam));
+    const hasUrlConfigOverrides = Boolean(
+      storageIdParam || machinesParam || cardsParam || notificationsParam || couponParam || shippingParam
+    );
+
+    // Always preserve school/campus/academic/admin details entered across steps (even if user clicked "Change Plan")
     if (savedDraft) {
       if (savedDraft.schoolProfileData) setSchoolProfileData((prev) => ({ ...prev, ...savedDraft.schoolProfileData }));
       if (savedDraft.campusContactData) setCampusContactData((prev) => ({ ...prev, ...savedDraft.campusContactData }));
       if (savedDraft.academicYearData) setAcademicYearData((prev) => ({ ...prev, ...savedDraft.academicYearData }));
       if (savedDraft.adminData) setAdminData((prev) => ({ ...prev, ...savedDraft.adminData }));
-      if (savedDraft.selectedStorageId !== undefined) setSelectedStorageId(savedDraft.selectedStorageId);
-      if (savedDraft.selectedMachines) setSelectedMachines(savedDraft.selectedMachines);
-      if (savedDraft.selectedCards) setSelectedCards(savedDraft.selectedCards);
-      if (savedDraft.selectedNotifications) setSelectedNotifications(savedDraft.selectedNotifications);
-      if (savedDraft.shippingAddress) setShippingAddress(savedDraft.shippingAddress);
-      if (savedDraft.couponCode) setCouponCode(savedDraft.couponCode);
-      if (savedDraft.appliedCoupon) setAppliedCoupon(savedDraft.appliedCoupon);
-      if (savedDraft.isTrialMode !== undefined && !planIdParam) setIsTrialMode(Boolean(savedDraft.isTrialMode));
+
+      if ((isExplicitResume || isSamePlanDraft) && !hasUrlConfigOverrides) {
+        if (savedDraft.selectedStorageId !== undefined) setSelectedStorageId(savedDraft.selectedStorageId);
+        if (savedDraft.selectedMachines) setSelectedMachines(savedDraft.selectedMachines);
+        if (savedDraft.selectedCards) setSelectedCards(savedDraft.selectedCards);
+        if (savedDraft.selectedNotifications) setSelectedNotifications(savedDraft.selectedNotifications);
+        if (savedDraft.shippingAddress) setShippingAddress(savedDraft.shippingAddress);
+        if (savedDraft.couponCode) setCouponCode(savedDraft.couponCode);
+        if (savedDraft.appliedCoupon) setAppliedCoupon(savedDraft.appliedCoupon);
+      }
 
       if (resumeParam === 'review') {
         setCurrentStep(5);
+      } else if (resumeParam === 'plan') {
+        setCurrentStep(0);
+      } else if (isSamePlanDraft && typeof savedDraft.currentStep === 'number' && !hasUrlConfigOverrides) {
+        setCurrentStep(Math.min(5, Math.max(0, savedDraft.currentStep)));
       } else {
         setCurrentStep(0);
       }
+    } else {
+      resetFormStatesToDefault();
+    }
+
+    // Hydrate add-on configuration passed via URL query params (e.g. from public /configure page)
+    const parsedStorageId = storageIdParam ? parseInt(storageIdParam, 10) || null : null;
+    const parsedMachines = parsePairsParam(machinesParam);
+    const parsedCards = parsePairsParam(cardsParam);
+    const rawNotifs = parsePairsParam(notificationsParam);
+    const parsedNotifs = {};
+    Object.entries(rawNotifs).forEach(([id, qty]) => {
+      parsedNotifs[id] = { selected: true, quantity: qty };
+    });
+
+    if (hasUrlConfigOverrides) {
+      setSelectedStorageId(parsedStorageId);
+      setSelectedMachines(parsedMachines);
+      setSelectedCards(parsedCards);
+      setSelectedNotifications(parsedNotifs);
+      if (shippingParam) setShippingAddress(shippingParam);
+      if (couponParam) setCouponCode(couponParam);
     }
 
     try {
@@ -230,9 +278,11 @@ function RegisterContent() {
       ]);
 
       const allPlans = Array.isArray(plansRes?.data) ? plansRes.data : [];
+      const fetchedCatalog = catalogRes?.data || {};
       setPlans(allPlans);
 
       if (catalogRes?.data) {
+<<<<<<< HEAD
         const activeNotifications = Array.isArray(catalogRes.data.notification_records)
           ? catalogRes.data.notification_records.filter((n) => Number(n.status) === 1)
           : [];
@@ -253,7 +303,31 @@ function RegisterContent() {
           }
           return next;
         });
+=======
+        setCatalog(fetchedCatalog);
+>>>>>>> 34a059f864995c17edd3b741ec11aa63009b6d6f
       }
+
+      const resolveInitialTrialFlag = (planObj, activeCouponObj) => {
+        const planSupportsTrial =
+          String(planObj.billing_cycle || '').toLowerCase() === 'trial' ||
+          parseFloat(planObj.price) <= 0 ||
+          parseInt(planObj.free_trial_days, 10) > 0;
+        if (!planSupportsTrial) return false;
+        const cScope = String(
+          activeCouponObj?.applicable_scope || activeCouponObj?.applicableScope || ''
+        ).toLowerCase();
+        if (activeCouponObj && (!cScope || cScope === 'plan_only')) {
+          return false;
+        }
+        if (trialRawParam !== null) {
+          return Boolean(trialParam);
+        }
+        if (isSamePlanDraft && savedDraft?.isTrialMode !== undefined) {
+          return Boolean(savedDraft.isTrialMode);
+        }
+        return true;
+      };
 
       // 1. Explicit URL plan_id parameter
       if (planIdParam) {
@@ -274,20 +348,48 @@ function RegisterContent() {
           }
         }
         if (found) {
-          const planSupportsTrial =
-            String(found.billing_cycle || '').toLowerCase() === 'trial' ||
-            parseFloat(found.price) <= 0 ||
-            parseInt(found.free_trial_days, 10) > 0;
+          let hydratedCoupon = (!hasUrlConfigOverrides && isSamePlanDraft) ? savedDraft?.appliedCoupon : null;
+          if (couponParam) {
+            try {
+              const foundCycle = String(found.billing_cycle || '').toLowerCase();
+              const isPureTr = foundCycle === 'trial' || parseFloat(found.price) <= 0;
+              const planAmt = isPureTr ? 0 : parseFloat(found.price || 0);
+              const storageObj = (fetchedCatalog.storage_plans || []).find(
+                (s) => Number(s.id) === Number(parsedStorageId)
+              );
+              const sCycle = isPureTr
+                ? (allPlans.find((p) => String(p.billing_cycle).toLowerCase() !== 'trial')?.billing_cycle || '')
+                : foundCycle;
+              const sAmt = storageObj ? Number(storageObj?.cycle_prices?.[sCycle] ?? 0) : 0;
+              const mAmt = Object.entries(parsedMachines).reduce((sum, [id, q]) => {
+                const m = (fetchedCatalog.attendance_machines || []).find((x) => Number(x.id) === Number(id));
+                return m ? sum + parseFloat(m.unit_price || 0) * q : sum;
+              }, 0);
+              const cAmt = Object.entries(parsedCards).reduce((sum, [id, q]) => {
+                const c = (fetchedCatalog.rfid_cards || []).find((x) => Number(x.id) === Number(id));
+                return c ? sum + parseFloat(c.unit_price || 0) * q : sum;
+              }, 0);
+              const nAmt = Object.entries(parsedNotifs).reduce((sum, [id, cfg]) => {
+                const n = (fetchedCatalog.notification_records || []).find((x) => Number(x.id) === Number(id));
+                return n && cfg?.selected ? sum + parseFloat(n.cost || n.unit_price || 0) * cfg.quantity : sum;
+              }, 0);
+              const couponRes = await saasApi.validateCoupon({
+                code: couponParam.trim(),
+                amount: Math.round((planAmt + sAmt + mAmt + cAmt + nAmt) * 100) / 100,
+                plan_amount: planAmt,
+                storage_amount: sAmt,
+                check_only: true,
+              });
+              if (couponRes?.data) {
+                hydratedCoupon = couponRes.data;
+                setAppliedCoupon(couponRes.data);
+              }
+            } catch (_) {}
+          }
 
           setSelectedPlan(found);
           setBillingCycle(found.billing_cycle || cycleParam);
-          setIsTrialMode(
-            savedDraft?.appliedCoupon
-              ? false
-              : trialRawParam !== null
-              ? Boolean(trialParam) && planSupportsTrial
-              : planSupportsTrial
-          );
+          setIsTrialMode(resolveInitialTrialFlag(found, hydratedCoupon));
           return;
         }
 
@@ -296,19 +398,13 @@ function RegisterContent() {
         return;
       }
 
-      // 2. Restore plan from saved payment-retry draft
+      // 2. Restore plan from saved draft
       if (savedDraft?.selectedPlanId) {
         const draftPlan = allPlans.find((p) => Number(p.id) === Number(savedDraft.selectedPlanId));
         if (draftPlan) {
           setSelectedPlan(draftPlan);
           setBillingCycle(savedDraft.billingCycle || draftPlan.billing_cycle || '');
-          if (savedDraft.appliedCoupon) {
-            setIsTrialMode(false);
-          } else if (savedDraft.isTrialMode !== undefined) {
-            setIsTrialMode(Boolean(savedDraft.isTrialMode));
-          } else {
-            setIsTrialMode(parseInt(draftPlan.free_trial_days, 10) > 0 || parseFloat(draftPlan.price) <= 0);
-          }
+          setIsTrialMode(resolveInitialTrialFlag(draftPlan, savedDraft.appliedCoupon));
           return;
         }
       }
@@ -325,6 +421,48 @@ function RegisterContent() {
       setCatalogLoading(false);
     }
   };
+
+  // Continuously persist onboarding progress in sessionStorage so refreshes, "Change Plan", or payment retries never wipe data
+  useEffect(() => {
+    if (loading || !selectedPlan?.id || typeof window === 'undefined') return;
+    try {
+      const draftSnapshot = {
+        currentStep,
+        selectedPlanId: selectedPlan.id,
+        billingCycle: billingCycle || selectedPlan.billing_cycle || '',
+        isTrialMode,
+        selectedStorageId,
+        selectedMachines,
+        selectedCards,
+        selectedNotifications,
+        shippingAddress,
+        couponCode,
+        appliedCoupon,
+        schoolProfileData,
+        campusContactData,
+        academicYearData,
+        adminData,
+      };
+      sessionStorage.setItem(DRAFT_STORAGE_KEY, JSON.stringify(draftSnapshot));
+    } catch (_) {}
+  }, [
+    loading,
+    currentStep,
+    selectedPlan,
+    billingCycle,
+    isTrialMode,
+    selectedStorageId,
+    selectedMachines,
+    selectedCards,
+    selectedNotifications,
+    shippingAddress,
+    couponCode,
+    appliedCoupon,
+    schoolProfileData,
+    campusContactData,
+    academicYearData,
+    adminData,
+  ]);
 
   // Keep shipping address synced with campus address until explicitly customized
   useEffect(() => {
@@ -453,7 +591,9 @@ function RegisterContent() {
       {/* Step 5: Review & Activate */}
       {currentStep === 5 && (
         <StepReview
+          plans={plans}
           selectedPlan={selectedPlan}
+          billingCycle={billingCycle}
           catalog={catalog}
           selectedStorageId={selectedStorageId}
           selectedMachines={selectedMachines}
