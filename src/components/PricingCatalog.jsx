@@ -5,7 +5,6 @@ import { useRouter } from 'next/navigation';
 import {
   Check,
   Users,
-  Building2,
   HardDrive,
   MessageSquare,
   BellRing,
@@ -207,14 +206,6 @@ export default function PricingCatalog() {
                   String(plan.billing_cycle || '').trim().toLowerCase() === 'trial' ||
                   priceNum <= 0;
                 const maxStudents = Number(plan.max_students) || 0;
-                const maxTeachers =
-                  plan.max_teachers !== undefined && plan.max_teachers !== null
-                    ? Number(plan.max_teachers)
-                    : null;
-                const maxBranches =
-                  plan.max_branches !== undefined && plan.max_branches !== null
-                    ? Number(plan.max_branches)
-                    : null;
                 const cycleMeta = plan.cycle_meta || {};
                 const cycleSuffix =
                   cycleMeta.shortLabel || cycleMeta.short_label || cycleMeta.label || plan.billing_cycle || '';
@@ -296,43 +287,6 @@ export default function PricingCatalog() {
                               Students
                             </span>
                           </li>
-
-                          {(maxTeachers !== null || maxBranches !== null) && (
-                            <li className="d-flex align-items-center gap-2 text-dark">
-                              <Building2 size={16} className="text-primary flex-shrink-0" />
-                              <span>
-                                {maxTeachers === 0 && maxBranches === 0 ? (
-                                  <>
-                                    <strong>Unlimited</strong> Teachers &amp; Branches
-                                  </>
-                                ) : (
-                                  <>
-                                    {maxTeachers !== null && (
-                                      <>
-                                        <strong>
-                                          {maxTeachers > 0
-                                            ? maxTeachers.toLocaleString('en-IN')
-                                            : 'Unlimited'}
-                                        </strong>{' '}
-                                        Teachers
-                                      </>
-                                    )}
-                                    {maxTeachers !== null && maxBranches !== null && ' • '}
-                                    {maxBranches !== null && (
-                                      <>
-                                        <strong>
-                                          {maxBranches > 0
-                                            ? maxBranches.toLocaleString('en-IN')
-                                            : 'Unlimited'}
-                                        </strong>{' '}
-                                        Branches
-                                      </>
-                                    )}
-                                  </>
-                                )}
-                              </span>
-                            </li>
-                          )}
 
                           {includedStorageGb > 0 && (
                             <li className="d-flex align-items-center gap-2 text-dark">

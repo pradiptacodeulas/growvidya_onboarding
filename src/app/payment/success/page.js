@@ -135,20 +135,7 @@ function OnboardingPaymentSuccessContent() {
       : `${cleanPortalBase}/account/login/adminlogin`
     : '';
 
-  const lineItems =
-    Array.isArray(order?.line_items) && order.line_items.length > 0
-      ? order.line_items
-      : order
-      ? [
-          {
-            category: 'subscription_plan',
-            title: order.plan_name || 'Institutional Subscription License',
-            quantity: 1,
-            unit_price: Number(order.subtotal_amount || order.grand_total || 0),
-            total_price: Number(order.subtotal_amount || order.grand_total || 0),
-          },
-        ]
-      : [];
+  const lineItems = Array.isArray(order?.line_items) ? order.line_items : [];
 
   const subtotal = Number(order?.subtotal_amount ?? order?.grand_total ?? 0);
   const discount = Number(order?.discount_amount ?? 0);

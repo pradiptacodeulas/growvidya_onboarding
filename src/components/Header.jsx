@@ -3,13 +3,10 @@
 import React from 'react';
 import Image from 'next/image';
 import Link from 'next/link';
-import { usePathname } from 'next/navigation';
 
 export default function Header() {
-  const pathname = usePathname();
   const rawPortalUrl = process.env.NEXT_PUBLIC_PORTAL_URL;
   const portalUrl = rawPortalUrl ? rawPortalUrl.trim().replace(/\/+$/, '') : '';
-  const isOnRegisterPage = pathname?.startsWith('/register');
 
   const handleAdminLoginClick = (e) => {
     if (!portalUrl) {
@@ -35,14 +32,6 @@ export default function Header() {
         </div>
 
         <div className="d-flex align-items-center gap-2 gap-md-3">
-          {isOnRegisterPage && (
-            <Link
-              href="/"
-              className="btn btn-light border btn-sm fw-semibold px-3 py-1"
-            >
-              View Plans
-            </Link>
-          )}
           <a
             href={portalUrl ? `${portalUrl}/account/login/adminlogin` : '#'}
             onClick={handleAdminLoginClick}

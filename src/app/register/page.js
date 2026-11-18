@@ -467,6 +467,13 @@ function RegisterContent() {
     }
   }, [campusContactData.address, shippingAddress]);
 
+  // Scroll to top when moving between steps
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+  }, [currentStep]);
+
   if (loading) {
     return (
       <div className="d-flex flex-column align-items-center justify-content-center min-vh-50 py-5 my-5">

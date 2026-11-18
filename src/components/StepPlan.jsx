@@ -4,9 +4,7 @@ import React, { useState, useMemo, useEffect } from 'react';
 import Link from 'next/link';
 import {
   Check,
-  Lock,
   Users,
-  Building2,
   ShieldCheck,
   ArrowRight,
   MessageSquare,
@@ -21,7 +19,6 @@ import {
   Receipt,
   ChevronDown,
   ChevronUp,
-  Layers,
   Tag,
   Loader2,
 } from 'lucide-react';
@@ -70,7 +67,6 @@ export default function StepPlan({
   campusContactData = {},
   onNext,
 }) {
-  const [showPlanSwitcher, setShowPlanSwitcher] = useState(false);
   const [couponError, setCouponError] = useState('');
   const [validatingCoupon, setValidatingCoupon] = useState(false);
   const [collapsedSections, setCollapsedSections] = useState({
@@ -101,14 +97,6 @@ export default function StepPlan({
     );
   }, [plans]);
 
-  const trialPlan = useMemo(
-    () =>
-      plans.find(
-        (p) => String(p.billing_cycle || '').toLowerCase() === 'trial' || parseFloat(p.price) <= 0
-      ) || null,
-    [plans]
-  );
-
   const activePaidCycle = useMemo(() => {
     const current = String(billingCycle || selectedPlan?.billing_cycle || '').toLowerCase();
     if (current && current !== 'trial' && availableCycles.some((c) => c.cycle === current)) {
@@ -116,19 +104,6 @@ export default function StepPlan({
     }
     return availableCycles[0]?.cycle || '';
   }, [billingCycle, selectedPlan?.billing_cycle, availableCycles]);
-
-  const plansForActiveCycle = useMemo(() => {
-    return plans
-      .filter((p) => {
-        const isTr = String(p.billing_cycle || '').toLowerCase() === 'trial' || parseFloat(p.price) <= 0;
-        return !isTr && String(p.billing_cycle || '').toLowerCase() === activePaidCycle;
-      })
-      .sort(
-        (a, b) =>
-          (Number(a.tier_rank) || 0) - (Number(b.tier_rank) || 0) ||
-          parseFloat(a.price || 0) - parseFloat(b.price || 0)
-      );
-  }, [plans, activePaidCycle]);
 
   const handleChoosePlan = (plan, activateAsTrial = true) => {
     if (!plan) return;
@@ -156,50 +131,6 @@ export default function StepPlan({
       if (planCycle) url.searchParams.set('cycle', planCycle);
       url.searchParams.set('trial', trialFlag ? '1' : '0');
       window.history.replaceState({}, '', url.toString());
-    }
-    setShowPlanSwitcher(false);
-  };
-
-  const handleSwitchCycleTab = (nextCycle) => {
-    if (setBillingCycle) setBillingCycle(nextCycle);
-    if (selectedPlan && String(selectedPlan.billing_cycle || '').toLowerCase() !== 'trial') {
-      const candidates = plans.filter(
-        (p) => String(p.billing_cycle || '').toLowerCase() === String(nextCycle).toLowerCase()
-      );
-      if (candidates.length > 0) {
-        const sameGroupOrRank =
-          candidates.find(
-            (p) =>
-              (selectedPlan.plan_group && p.plan_group === selectedPlan.plan_group) ||
-              Number(p.tier_rank) === Number(selectedPlan.tier_rank)
-          ) ||
-          candidates.find((p) => Number(p.is_popular) === 1) ||
-          candidates[0];
-        if (sameGroupOrRank && setSelectedPlan) {
-          const nextPlanCycle = String(sameGroupOrRank.billing_cycle || '').toLowerCase();
-          const nextSupportsTrial =
-            nextPlanCycle === 'trial' ||
-            parseFloat(sameGroupOrRank.price) <= 0 ||
-            parseInt(sameGroupOrRank.free_trial_days, 10) > 0;
-          const couponScope = String(
-            appliedCoupon?.applicable_scope || appliedCoupon?.applicableScope || ''
-          ).toLowerCase();
-          const isPlanOnlyCoupon = Boolean(
-            appliedCoupon && (!couponScope || couponScope === 'plan_only')
-          );
-          const nextTrialFlag = isPlanOnlyCoupon ? false : nextSupportsTrial;
-
-          setSelectedPlan(sameGroupOrRank);
-          if (setIsTrialMode) setIsTrialMode(nextTrialFlag);
-          if (typeof window !== 'undefined') {
-            const url = new URL(window.location.href);
-            url.searchParams.set('plan_id', String(sameGroupOrRank.id));
-            if (nextPlanCycle) url.searchParams.set('cycle', nextPlanCycle);
-            url.searchParams.set('trial', nextTrialFlag ? '1' : '0');
-            window.history.replaceState({}, '', url.toString());
-          }
-        }
-      }
     }
   };
 
@@ -719,12 +650,12 @@ export default function StepPlan({
               </div>
               {trialDays > 0 ? (
                 <span className="badge bg-success-subtle text-success border border-success-subtle rounded-pill px-3 py-1 fs-11 fw-semibold mt-1">
-                  <ShieldCheck size={12} className="me-1 inline" />
+                  <ShieldCheck size={12} className="me-1 d-inline" />
                   {isPureTrialPlan ? `${trialDays}-Day Free Evaluation` : `Includes ${trialDays}-Day Free Trial`}
                 </span>
               ) : (
                 <span className="badge bg-success-subtle text-success border border-success-subtle rounded-pill px-3 py-1 fs-11 fw-semibold mt-1">
-                  <ShieldCheck size={12} className="me-1 inline" />
+                  <ShieldCheck size={12} className="me-1 d-inline" />
                   Instant Online Activation • Flat Net Price
                 </span>
               )}
@@ -745,16 +676,6 @@ export default function StepPlan({
                     ? `Up to ${Number(selectedPlan.max_students).toLocaleString('en-IN')} Students`
                     : 'Unlimited Students'}
                 </div>
-              </div>
-            </div>
-
-            <div className="col-sm-6 col-lg-3">
-              <div className="p-3 bg-light rounded-3 border h-100">
-                <div className="d-flex align-items-center gap-2 mb-1">
-                  <Building2 size={18} className="text-success" />
-                  <span className="fs-12 text-muted fw-semibold">Teachers &amp; Branches</span>
-                </div>
-                <div className="fs-16 fw-bold text-dark">Unlimited</div>
               </div>
             </div>
 
@@ -970,8 +891,7 @@ export default function StepPlan({
                               <div className="fs-13 text-muted mb-2">
                                 Capacity:{' '}
                                 <strong>
-                                  +{st.storage_capacity}{' '}
-                                  {st.unit_code || (Number(st.capacity_unit_id) === 3 ? 'TB' : 'GB')}
+                                  +{st.storage_capacity} {st.unit_code || st.unit_name || ''}
                                 </strong>
                               </div>
                               <div className="fs-16 fw-bold text-primary">
@@ -1043,14 +963,8 @@ export default function StepPlan({
 
               {!collapsedSections.machines && (
                 <div className="mt-4 pt-3 border-top">
-                  {attendanceMachines.length === 0 ? (
-                    <div className="text-center py-4 bg-white rounded-3 border text-muted">
-                      <Cpu size={28} className="text-secondary opacity-50 mb-2" />
-                      <p className="mb-0 fs-13">No biometric machines currently listed in catalog.</p>
-                    </div>
-                  ) : (
-                    <div className="row g-3">
-                      {attendanceMachines.map((m) => {
+                  <div className="row g-3">
+                    {attendanceMachines.map((m) => {
                         const qty = selectedMachines[m.id] || 0;
                         const isAdded = qty > 0;
                         const imgUrl = resolveImageUrl(m.machine_image);
@@ -1153,7 +1067,6 @@ export default function StepPlan({
                         );
                       })}
                     </div>
-                  )}
                 </div>
               )}
             </div>
@@ -1198,14 +1111,8 @@ export default function StepPlan({
 
               {!collapsedSections.cards && (
                 <div className="mt-4 pt-3 border-top">
-                  {rfidCards.length === 0 ? (
-                    <div className="text-center py-4 bg-white rounded-3 border text-muted">
-                      <IdCard size={28} className="text-secondary opacity-50 mb-2" />
-                      <p className="mb-0 fs-13">No RFID cards currently listed in catalog.</p>
-                    </div>
-                  ) : (
-                    <div className="row g-3">
-                      {rfidCards.map((c) => {
+                  <div className="row g-3">
+                    {rfidCards.map((c) => {
                         const minQty = Math.max(1, parseInt(c.min_order_qty, 10) || 1);
                         const qty = selectedCards[c.id] || 0;
                         const isAdded = qty > 0;
@@ -1304,7 +1211,6 @@ export default function StepPlan({
                         );
                       })}
                     </div>
-                  )}
                 </div>
               )}
             </div>
@@ -1498,7 +1404,7 @@ export default function StepPlan({
                   </div>
                   <div className="text-muted fs-12">
                     +{selectedStorage.storage_capacity}{' '}
-                    {selectedStorage.unit_code || (Number(selectedStorage.capacity_unit_id) === 3 ? 'TB' : 'GB')} (
+                    {selectedStorage.unit_code || selectedStorage.unit_name || ''} (
                     {storageCycleMeta.label || effectiveStorageCycle})
                   </div>
                 </div>
@@ -1638,7 +1544,7 @@ export default function StepPlan({
                   >
                     {validatingCoupon ? (
                       <>
-                        <Loader2 size={13} className="animate-spin me-1 inline" />
+                        <Loader2 size={13} className="animate-spin me-1 d-inline" />
                         <span>Checking...</span>
                       </>
                     ) : (
@@ -1721,14 +1627,8 @@ export default function StepPlan({
               className="btn btn-success w-100 py-2 fw-semibold d-flex align-items-center justify-content-center gap-2 fs-15 shadow-sm"
               onClick={onNext}
             >
-              <span>
-                {isEffectiveTrial
-                  ? grandTotal > 0
-                    ? `Continue: ${trialDays > 0 ? `${trialDays}-Day ` : ''}Free Trial (+₹${grandTotal.toLocaleString('en-IN')})`
-                    : `Continue: ${trialDays > 0 ? `for ${trialDays} days ` : ''}Free Trial`
-                  : `Continue to School Profile (₹${grandTotal.toLocaleString('en-IN')})`}
-              </span>
-              <ArrowRight size={16} />
+              <span>Continue</span>
+              <ArrowRight size={16} className="flex-shrink-0" />
             </button>
           </div>
         </div>

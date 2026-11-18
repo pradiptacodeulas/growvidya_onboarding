@@ -20,17 +20,6 @@ body {
   margin-bottom: 2rem;
 }
 
-.stepper-container::before {
-  content: '';
-  position: absolute;
-  top: 20px;
-  left: 40px;
-  right: 40px;
-  height: 2px;
-  background-color: #e2e8f0;
-  z-index: 1;
-}
-
 .step-item {
   position: relative;
   z-index: 2;
@@ -38,7 +27,20 @@ body {
   flex: 1;
 }
 
+.step-item:not(:last-child)::after {
+  content: '';
+  position: absolute;
+  top: 20px;
+  left: 50%;
+  width: 100%;
+  height: 2px;
+  background-color: #e2e8f0;
+  z-index: 1;
+}
+
 .step-circle {
+  position: relative;
+  z-index: 2;
   width: 42px;
   height: 42px;
   border-radius: 50%;
@@ -85,6 +87,39 @@ body {
   box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05), 0 2px 4px -2px rgba(0, 0, 0, 0.05);
 }
 
+@keyframes spin {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.animate-spin {
+  animation: spin 1s linear infinite;
+}
+
+.border-dashed {
+  border-style: dashed !important;
+}
+
+.shadow-2xs {
+  box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
+}
+
+.min-vh-50 {
+  min-height: 50vh;
+}
+
+.hover-shadow {
+  transition: box-shadow 0.15s ease-in-out, border-color 0.15s ease-in-out;
+}
+
+.hover-shadow:hover {
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+}
+
 /* Precision font-size utility classes used across onboarding & receipts */
 .fs-10 { font-size: 10px !important; }
 .fs-11 { font-size: 11px !important; }
@@ -124,7 +159,7 @@ body {
     padding-bottom: 12px;
     gap: 8px;
   }
-  .stepper-container::before {
+  .step-item:not(:last-child)::after {
     display: none;
   }
   .step-item {

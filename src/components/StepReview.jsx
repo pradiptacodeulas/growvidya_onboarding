@@ -3,6 +3,7 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import {
+  ArrowLeft,
   Tag,
   Loader2,
   Sparkles,
@@ -875,7 +876,7 @@ export default function StepReview({
                     ? `${cycleMeta.label} License • Includes ${trialDays}-Day Free Trial Option`
                     : isPureFreeOrTrial
                       ? `Free Evaluation Access${trialDays > 0 ? ` (${trialDays} Days)` : ''}`
-                      : `${cycleMeta.label} License • Unlimited Teachers & Branches • ${Math.max(
+                      : `${cycleMeta.label} License • ${Math.max(
                         0,
                         parseInt(selectedPlan?.included_storage_gb, 10) || 0
                       )} GB Base Cloud Storage`}
@@ -939,7 +940,7 @@ export default function StepReview({
                         >
                           {validatingCoupon ? (
                             <>
-                              <Loader2 size={14} className="animate-spin me-1 inline" />
+                              <Loader2 size={14} className="animate-spin me-1 d-inline" />
                               <span>Checking...</span>
                             </>
                           ) : (
@@ -995,7 +996,7 @@ export default function StepReview({
                   <div className="d-flex justify-content-between text-dark">
                     <span>
                       Cloud Storage Expansion ({selectedStorage.plan_name} — +{selectedStorage.storage_capacity}{' '}
-                      {selectedStorage.unit_code || 'GB'}, {storageCycleMeta.label || effectiveStorageCycle}):
+                      {selectedStorage.unit_code || selectedStorage.unit_name || ''}, {storageCycleMeta.label || effectiveStorageCycle}):
                     </span>
                     <span className="fw-semibold">
                       +₹{Number(storagePrice).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
@@ -1083,18 +1084,18 @@ export default function StepReview({
       </div>
 
       {/* Action Navigation Buttons */}
-      <div className="d-flex flex-wrap justify-content-between align-items-center gap-3 pt-4 border-top mt-4">
+      <div className="d-flex flex-column-reverse flex-sm-row flex-wrap justify-content-between align-items-stretch align-items-sm-center gap-3 pt-4 border-top mt-4">
         <button
           type="button"
-          className="btn btn-outline-secondary px-4 py-2 fw-semibold fs-14"
+          className="btn btn-outline-secondary px-4 py-2 fw-semibold fs-14 d-inline-flex align-items-center justify-content-center gap-2"
           onClick={onBack}
           disabled={submitting}
         >
-          Back
+          <ArrowLeft size={16} className="flex-shrink-0" />
+          <span>Back</span>
         </button>
 
-
-        <div className="d-flex flex-wrap align-items-center gap-3 ms-auto">
+        <div className="d-flex flex-column flex-sm-row flex-wrap align-items-stretch align-items-sm-center gap-2 gap-sm-3 ms-sm-auto">
           {hasTrialOption ? (
             <>
               <button
@@ -1103,7 +1104,7 @@ export default function StepReview({
                   !isEffectiveTrial
                     ? 'btn-primary shadow-sm'
                     : 'btn-outline-primary'
-                } px-4 py-2 fw-semibold fs-14`}
+                } px-4 py-2 fw-semibold fs-14 d-inline-flex align-items-center justify-content-center gap-2`}
                 onClick={() => executeOnboardingCheckout(false)}
                 disabled={submitting}
               >
@@ -1127,7 +1128,7 @@ export default function StepReview({
                   isEffectiveTrial
                     ? 'btn-success shadow-sm'
                     : 'btn-outline-success'
-                } px-4 py-2 fw-semibold fs-14`}
+                } px-4 py-2 fw-semibold fs-14 d-inline-flex align-items-center justify-content-center gap-2`}
                 onClick={() => executeOnboardingCheckout(true)}
                 disabled={submitting}
               >
@@ -1146,7 +1147,7 @@ export default function StepReview({
           ) : isPureFreeOrTrial ? (
             <button
               type="button"
-              className="btn btn-success px-4 py-2 fw-semibold fs-14 shadow-sm"
+              className="btn btn-success px-4 py-2 fw-semibold fs-14 shadow-sm d-inline-flex align-items-center justify-content-center gap-2"
               onClick={() => executeOnboardingCheckout(true)}
               disabled={submitting}
             >
@@ -1166,7 +1167,7 @@ export default function StepReview({
           ) : (
             <button
               type="button"
-              className="btn btn-primary px-4 py-2 fw-semibold fs-14 shadow-sm"
+              className="btn btn-primary px-4 py-2 fw-semibold fs-14 shadow-sm d-inline-flex align-items-center justify-content-center gap-2"
               onClick={() => executeOnboardingCheckout(false)}
               disabled={submitting}
             >
@@ -1183,7 +1184,6 @@ export default function StepReview({
             </button>
           )}
         </div>
-
       </div>
     </div>
   );

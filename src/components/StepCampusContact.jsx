@@ -131,8 +131,8 @@ export default function StepCampusContact({
   const handleChange = (e) => {
     const { name, value } = e.target;
     setFormData((prev) => ({ ...prev, [name]: value }));
-    if (errors[name]) {
-      setErrors((prev) => ({ ...prev, [name]: null }));
+    if (errors[name] || errors.general) {
+      setErrors((prev) => ({ ...prev, [name]: null, general: null }));
     }
   };
 
@@ -202,16 +202,15 @@ export default function StepCampusContact({
         return;
       }
     } catch (err) {
-      const errorMsg = err.response?.data?.message;
-      if (errorMsg) {
-        if (errorMsg.toLowerCase().includes('email')) {
-          setErrors((prev) => ({ ...prev, email: errorMsg }));
-          return;
-        } else if (errorMsg.toLowerCase().includes('phone')) {
-          setErrors((prev) => ({ ...prev, phone_number: errorMsg }));
-          return;
-        }
+      const errorMsg = err.response?.data?.message || err.message || 'Unable to verify availability. Please try again.';
+      if (errorMsg.toLowerCase().includes('email')) {
+        setErrors((prev) => ({ ...prev, email: errorMsg }));
+      } else if (errorMsg.toLowerCase().includes('phone')) {
+        setErrors((prev) => ({ ...prev, phone_number: errorMsg }));
+      } else {
+        setErrors((prev) => ({ ...prev, general: errorMsg }));
       }
+      return;
     } finally {
       setCheckingAvailability(false);
     }
@@ -429,31 +428,31 @@ export default function StepCampusContact({
       </div>
 
       {/* Navigation Buttons */}
-      <div className="d-flex justify-content-between pt-4 border-top mt-4">
+      <div className="d-flex justify-content-between align-items-center gap-2 pt-4 border-top mt-4">
         <button
           type="button"
-          className="btn btn-outline-secondary px-4 py-2 fw-semibold d-flex align-items-center gap-2"
+          className="btn btn-outline-secondary px-4 py-2 fw-semibold d-flex align-items-center justify-content-center gap-2"
           onClick={onBack}
         >
-          <ArrowLeft size={16} />
-          <span>Back: School Profile</span>
+          <ArrowLeft size={16} className="flex-shrink-0" />
+          <span>Back</span>
         </button>
 
         <button
           type="button"
-          className="btn btn-primary px-4 py-2 fw-semibold d-flex align-items-center gap-2"
+          className="btn btn-primary px-4 py-2 fw-semibold d-flex align-items-center justify-content-center gap-2"
           onClick={handleValidateAndNext}
           disabled={checkingAvailability}
         >
           {checkingAvailability ? (
             <>
-              <Loader2 size={16} className="animate-spin" />
-              <span>Checking Availability...</span>
+              <Loader2 size={16} className="animate-spin flex-shrink-0" />
+              <span>Checking...</span>
             </>
           ) : (
             <>
-              <span>Continue: Academic Year</span>
-              <ArrowRight size={16} />
+              <span>Continue</span>
+              <ArrowRight size={16} className="flex-shrink-0" />
             </>
           )}
         </button>

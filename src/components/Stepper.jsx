@@ -1,9 +1,22 @@
 'use client';
 
-import React from 'react';
-import { Check, ShieldCheck, Package, School, Building2, Calendar, UserCheck, CreditCard } from 'lucide-react';
+import React, { useEffect, useRef } from 'react';
+import { Check, ShieldCheck, School, Building2, Calendar, UserCheck, CreditCard } from 'lucide-react';
 
 export default function Stepper({ currentStep, steps = [] }) {
+  const containerRef = useRef(null);
+
+  useEffect(() => {
+    const container = containerRef.current;
+    if (!container) return;
+    const activeItem = container.querySelector('.step-item.active');
+    if (activeItem && container.scrollWidth > container.clientWidth) {
+      const targetLeft =
+        activeItem.offsetLeft - container.clientWidth / 2 + activeItem.offsetWidth / 2;
+      container.scrollTo({ left: Math.max(0, targetLeft), behavior: 'smooth' });
+    }
+  }, [currentStep]);
+
   const getStepIcon = (index) => {
     switch (index) {
       case 0:
@@ -24,7 +37,7 @@ export default function Stepper({ currentStep, steps = [] }) {
   };
 
   return (
-    <div className="stepper-container mb-4">
+    <div ref={containerRef} className="stepper-container mb-4">
       {steps.map((step, index) => {
         const isCompleted = index < currentStep;
         const isActive = index === currentStep;
