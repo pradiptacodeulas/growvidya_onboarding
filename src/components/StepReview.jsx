@@ -1104,7 +1104,7 @@ export default function StepReview({
                   !isEffectiveTrial
                     ? 'btn-primary shadow-sm'
                     : 'btn-outline-primary'
-                } px-4 py-2 fw-semibold fs-14 d-inline-flex align-items-center justify-content-center gap-2`}
+                } px-4 py-2 fw-semibold fs-14 d-inline-flex align-items-center justify-content-center gap-2 d-none`}
                 onClick={() => executeOnboardingCheckout(false)}
                 disabled={submitting}
               >
