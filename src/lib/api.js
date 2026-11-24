@@ -66,6 +66,16 @@ export const saasApi = {
     return res.data;
   },
 
+  sendRegistrationOtp: async (payload) => {
+    const res = await apiClient.post('/saas/send-registration-otp', payload);
+    return res.data;
+  },
+
+  verifyRegistrationOtp: async (payload) => {
+    const res = await apiClient.post('/saas/verify-registration-otp', payload);
+    return res.data;
+  },
+
   getCountries: async () => {
     const res = await apiClient.get('/saas/locations/countries');
     return res.data;

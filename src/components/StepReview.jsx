@@ -389,11 +389,13 @@ export default function StepReview({
         first_name: adminData.first_name,
         last_name: adminData.last_name || null,
         email: adminData.email,
+        email_verification_token: adminData.email_verification_token || null,
         phone: adminData.phone || null,
         gender: adminData.gender ? parseInt(adminData.gender, 10) : null,
         picture: adminData.picture || null,
         password: adminData.password,
       },
+      email_verification_token: adminData.email_verification_token || null,
       razorpay_order_id: paymentProof.orderId || null,
       razorpay_payment_id: paymentProof.paymentId || null,
       razorpay_signature: paymentProof.signature || null,
@@ -435,6 +437,17 @@ export default function StepReview({
   const executeOnboardingCheckout = async (isTrialAction = false) => {
     if (!selectedPlan) {
       setErrorMessage('Please select a subscription package before activating.');
+      return;
+    }
+
+    const cleanAdminEmail = (adminData?.email || '').trim().toLowerCase();
+    const isEmailOtpVerified = Boolean(
+      adminData?.email_verified &&
+        adminData?.email_verification_token &&
+        String(adminData?.verified_email || '').trim().toLowerCase() === cleanAdminEmail
+    );
+    if (!isEmailOtpVerified) {
+      setErrorMessage('Please go back to the Super Admin step and verify your login email address via OTP before completing registration.');
       return;
     }
 
