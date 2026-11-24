@@ -40,6 +40,7 @@ export default function StepAdmin({
   const [verifyingOtp, setVerifyingOtp] = useState(false);
   const [otpSuccessMsg, setOtpSuccessMsg] = useState('');
   const [otpErrorMsg, setOtpErrorMsg] = useState('');
+  const [resendCooldown, setResendCooldown] = useState(0);
 
   const cleanCurrentEmail = (formData.email || '').trim().toLowerCase();
   const isValidEmailFormat = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(cleanCurrentEmail);
@@ -106,6 +107,14 @@ export default function StepAdmin({
       window.removeEventListener('keydown', handleKeyDown, true);
     };
   }, [isOtpModalOpen]);
+
+  useEffect(() => {
+    if (resendCooldown <= 0) return;
+    const timer = setInterval(() => {
+      setResendCooldown((prev) => (prev > 0 ? prev - 1 : 0));
+    }, 1000);
+    return () => clearInterval(timer);
+  }, [resendCooldown]);
 
   const fetchGenders = async () => {
     try {
@@ -179,6 +188,7 @@ export default function StepAdmin({
       setShowOtpModal(true);
       setOtpSentEmail(targetEmail);
       setOtpCode('');
+      setResendCooldown(60);
       setOtpSuccessMsg(res?.message || '');
     } catch (err) {
       const errMsg =
@@ -660,29 +670,29 @@ export default function StepAdmin({
             right: 0,
             bottom: 0,
             zIndex: 9999,
-            backgroundColor: 'rgba(15, 23, 42, 0.75)',
+            backgroundColor: 'rgba(0, 0, 0, 0.7)',
             backdropFilter: 'blur(4px)',
           }}
         >
           <div
             ref={otpModalRef}
             className="card border-0 shadow-lg rounded-4 p-4 w-100 bg-white"
-            style={{ maxWidth: '420px' }}
+            style={{ maxWidth: '480px' }}
           >
-            {/* Modal Header: Back Button on Left + Title */}
-            <div className="d-flex align-items-center gap-2 pb-3 mb-3 border-bottom">
+            {/* Modal Header: Back Button on Left + Centered Title */}
+            <div className="position-relative d-flex align-items-center justify-content-center pb-3 mb-3 border-bottom">
               <button
                 type="button"
                 onClick={handleCloseOtpModal}
-                className="btn btn-light btn-sm d-inline-flex align-items-center justify-content-center rounded-circle p-2 border"
+                className="btn btn-light btn-sm d-inline-flex align-items-center justify-content-center rounded-circle p-2 border position-absolute start-0"
                 title="Back to change email"
                 aria-label="Back to change email"
               >
                 <ArrowLeft size={16} />
               </button>
-              <h5 id="email-otp-modal-title" className="fw-bold text-dark mb-0">
+              <h6 id="email-otp-modal-title" className="fw-bold text-dark mb-0 fs-15">
                 OTP Verification
-              </h5>
+              </h6>
             </div>
 
             {/* Middle Portion */}
@@ -754,18 +764,17 @@ export default function StepAdmin({
                 type="button"
                 className="btn btn-link btn-sm text-decoration-none fw-semibold d-inline-flex align-items-center gap-1"
                 onClick={() => handleSendOtp(otpSentEmail)}
-                disabled={sendingOtp || verifyingOtp}
+                disabled={sendingOtp || verifyingOtp || resendCooldown > 0}
               >
                 {sendingOtp ? (
                   <>
                     <Loader2 size={14} className="animate-spin" />
                     <span>Sending...</span>
                   </>
+                ) : resendCooldown > 0 ? (
+                  <span>Resend Code (in {resendCooldown} secs)</span>
                 ) : (
-                  <>
-                    <RefreshCw size={14} />
-                    <span>Resend</span>
-                  </>
+                  <span>Resend Code</span>
                 )}
               </button>
             </div>
