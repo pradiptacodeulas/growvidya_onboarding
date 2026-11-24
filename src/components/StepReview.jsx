@@ -17,7 +17,6 @@ import {
 } from 'lucide-react';
 import saasApi from '../lib/api';
 
-const DRAFT_STORAGE_KEY = 'growvidya_onboarding_draft';
 const RESULT_STORAGE_KEY = 'growvidya_onboarding_result';
 
 export default function StepReview({
@@ -423,7 +422,6 @@ export default function StepReview({
             order: resData.order || null,
           })
         );
-        sessionStorage.removeItem(DRAFT_STORAGE_KEY);
       } catch (storageErr) {
         console.warn('Could not store onboarding result in sessionStorage:', storageErr);
       }
@@ -623,37 +621,9 @@ export default function StepReview({
         } catch {
           // Non-blocking audit log
         }
-        if (typeof window !== 'undefined') {
-          try {
-            const failureDraftSnapshot = {
-              currentStep: 5,
-              selectedPlanId: selectedPlan?.id || null,
-              billingCycle: effectiveStorageCycle || selectedPlan?.billing_cycle || '',
-              isTrialMode: isTrialAction,
-              selectedStorageId,
-              selectedMachines,
-              selectedCards,
-              selectedNotifications,
-              shippingAddress: resolvedShippingAddress,
-              couponCode,
-              appliedCoupon,
-              schoolProfileData,
-              campusContactData,
-              academicYearData,
-              adminData,
-            };
-            sessionStorage.setItem(DRAFT_STORAGE_KEY, JSON.stringify(failureDraftSnapshot));
-          } catch (storageErr) {
-            console.warn('Could not persist failure recovery draft:', storageErr);
-          }
-        }
         setSubmitting(false);
         setStatusMessage('');
-        router.push(
-          `/payment/failed?order_no=${encodeURIComponent(
-            orderData.order_no || ''
-          )}&code=${encodeURIComponent(errCode)}&reason=${encodeURIComponent(errDesc)}`
-        );
+        setErrorMessage(`Payment could not be completed (${errCode}): ${errDesc}`);
       });
 
       rzp.open();

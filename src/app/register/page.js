@@ -23,8 +23,6 @@ const STEPS = [
   { title: 'Review & Activate' },
 ];
 
-const DRAFT_STORAGE_KEY = 'growvidya_onboarding_draft';
-
 function parsePairsParam(raw) {
   const result = {};
   if (!raw || typeof raw !== 'string') return result;
@@ -46,7 +44,6 @@ function RegisterContent() {
   const cycleParam = searchParams.get('cycle') || searchParams.get('billing_cycle') || '';
   const trialRawParam = searchParams.get('trial');
   const trialParam = trialRawParam === null ? true : trialRawParam === '1' || trialRawParam === 'true';
-  const resumeParam = searchParams.get('resume') || '';
   const storageIdParam = searchParams.get('storage_id') || '';
   const machinesParam = searchParams.get('machines') || '';
   const cardsParam = searchParams.get('cards') || '';
@@ -190,68 +187,23 @@ function RegisterContent() {
   };
 
   const initializeWizard = async () => {
-    let savedDraft = null;
-    const isExplicitResume = resumeParam === 'review' || resumeParam === 'plan';
-
     if (typeof window !== 'undefined') {
       try {
-        const raw = sessionStorage.getItem(DRAFT_STORAGE_KEY);
-        if (raw) {
-          savedDraft = JSON.parse(raw);
-        }
-
-        if (isExplicitResume) {
-          const cleanUrl = new URL(window.location.href);
-          cleanUrl.searchParams.delete('resume');
-          window.history.replaceState({}, '', cleanUrl.toString());
-        }
-      } catch (e) {
-        console.warn('Could not manage onboarding draft in sessionStorage:', e);
-      }
+        sessionStorage.removeItem('growvidya_onboarding_draft');
+      } catch (_) {}
     }
 
-    // If accessed directly without a selected plan_id and without a saved draft, redirect to Pricing Page
-    if (!planIdParam && !savedDraft?.selectedPlanId) {
+    // If accessed directly without a selected plan_id, redirect to Pricing Page
+    if (!planIdParam) {
       router.replace('/');
       return;
     }
 
-    const isSamePlanDraft =
-      savedDraft &&
-      (!planIdParam || String(savedDraft.selectedPlanId) === String(planIdParam));
     const hasUrlConfigOverrides = Boolean(
       storageIdParam || machinesParam || cardsParam || notificationsParam || couponParam || shippingParam
     );
 
-    // Always preserve school/campus/academic/admin details entered across steps (even if user clicked "Change Plan")
-    if (savedDraft) {
-      if (savedDraft.schoolProfileData) setSchoolProfileData((prev) => ({ ...prev, ...savedDraft.schoolProfileData }));
-      if (savedDraft.campusContactData) setCampusContactData((prev) => ({ ...prev, ...savedDraft.campusContactData }));
-      if (savedDraft.academicYearData) setAcademicYearData((prev) => ({ ...prev, ...savedDraft.academicYearData }));
-      if (savedDraft.adminData) setAdminData((prev) => ({ ...prev, ...savedDraft.adminData }));
-
-      if ((isExplicitResume || isSamePlanDraft) && !hasUrlConfigOverrides) {
-        if (savedDraft.selectedStorageId !== undefined) setSelectedStorageId(savedDraft.selectedStorageId);
-        if (savedDraft.selectedMachines) setSelectedMachines(savedDraft.selectedMachines);
-        if (savedDraft.selectedCards) setSelectedCards(savedDraft.selectedCards);
-        if (savedDraft.selectedNotifications) setSelectedNotifications(savedDraft.selectedNotifications);
-        if (savedDraft.shippingAddress) setShippingAddress(savedDraft.shippingAddress);
-        if (savedDraft.couponCode) setCouponCode(savedDraft.couponCode);
-        if (savedDraft.appliedCoupon) setAppliedCoupon(savedDraft.appliedCoupon);
-      }
-
-      if (resumeParam === 'review') {
-        setCurrentStep(5);
-      } else if (resumeParam === 'plan') {
-        setCurrentStep(0);
-      } else if (isSamePlanDraft && typeof savedDraft.currentStep === 'number' && !hasUrlConfigOverrides) {
-        setCurrentStep(Math.min(5, Math.max(0, savedDraft.currentStep)));
-      } else {
-        setCurrentStep(0);
-      }
-    } else {
-      resetFormStatesToDefault();
-    }
+    resetFormStatesToDefault();
 
     // Hydrate add-on configuration passed via URL query params (e.g. from public /configure page)
     const parsedStorageId = storageIdParam ? parseInt(storageIdParam, 10) || null : null;
@@ -324,92 +276,72 @@ function RegisterContent() {
         if (trialRawParam !== null) {
           return Boolean(trialParam);
         }
-        if (isSamePlanDraft && savedDraft?.isTrialMode !== undefined) {
-          return Boolean(savedDraft.isTrialMode);
-        }
         return true;
       };
 
-      // 1. Explicit URL plan_id parameter
-      if (planIdParam) {
-        let found = allPlans.find((p) => String(p.id) === String(planIdParam));
-        if (found && cycleParam && cycleParam.toLowerCase() !== 'trial') {
-          const foundCycle = String(found.billing_cycle || '').toLowerCase();
-          const targetCycle = cycleParam.toLowerCase();
-          if (foundCycle !== targetCycle) {
-            const cycleMatch = allPlans.find(
-              (p) =>
-                String(p.billing_cycle || '').toLowerCase() === targetCycle &&
-                ((found.plan_group && p.plan_group === found.plan_group) ||
-                  String(p.plan_name || '').toLowerCase() === String(found.plan_name || '').toLowerCase())
+      let found = allPlans.find((p) => String(p.id) === String(planIdParam));
+      if (found && cycleParam && cycleParam.toLowerCase() !== 'trial') {
+        const foundCycle = String(found.billing_cycle || '').toLowerCase();
+        const targetCycle = cycleParam.toLowerCase();
+        if (foundCycle !== targetCycle) {
+          const cycleMatch = allPlans.find(
+            (p) =>
+              String(p.billing_cycle || '').toLowerCase() === targetCycle &&
+              ((found.plan_group && p.plan_group === found.plan_group) ||
+                String(p.plan_name || '').toLowerCase() === String(found.plan_name || '').toLowerCase())
+          );
+          if (cycleMatch) {
+            found = cycleMatch;
+          }
+        }
+      }
+      if (found) {
+        let hydratedCoupon = null;
+        if (couponParam) {
+          try {
+            const foundCycle = String(found.billing_cycle || '').toLowerCase();
+            const isPureTr = foundCycle === 'trial' || parseFloat(found.price) <= 0;
+            const planAmt = isPureTr ? 0 : parseFloat(found.price || 0);
+            const storageObj = (fetchedCatalog.storage_plans || []).find(
+              (s) => Number(s.id) === Number(parsedStorageId)
             );
-            if (cycleMatch) {
-              found = cycleMatch;
+            const sCycle = isPureTr
+              ? (allPlans.find((p) => String(p.billing_cycle).toLowerCase() !== 'trial')?.billing_cycle || '')
+              : foundCycle;
+            const sAmt = storageObj ? Number(storageObj?.cycle_prices?.[sCycle] ?? 0) : 0;
+            const mAmt = Object.entries(parsedMachines).reduce((sum, [id, q]) => {
+              const m = (fetchedCatalog.attendance_machines || []).find((x) => Number(x.id) === Number(id));
+              return m ? sum + parseFloat(m.unit_price || 0) * q : sum;
+            }, 0);
+            const cAmt = Object.entries(parsedCards).reduce((sum, [id, q]) => {
+              const c = (fetchedCatalog.rfid_cards || []).find((x) => Number(x.id) === Number(id));
+              return c ? sum + parseFloat(c.unit_price || 0) * q : sum;
+            }, 0);
+            const nAmt = Object.entries(parsedNotifs).reduce((sum, [id, cfg]) => {
+              const n = (fetchedCatalog.notification_records || []).find((x) => Number(x.id) === Number(id));
+              return n && cfg?.selected ? sum + parseFloat(n.cost || n.unit_price || 0) * cfg.quantity : sum;
+            }, 0);
+            const couponRes = await saasApi.validateCoupon({
+              code: couponParam.trim(),
+              amount: Math.round((planAmt + sAmt + mAmt + cAmt + nAmt) * 100) / 100,
+              plan_amount: planAmt,
+              storage_amount: sAmt,
+              check_only: true,
+            });
+            if (couponRes?.data) {
+              hydratedCoupon = couponRes.data;
+              setAppliedCoupon(couponRes.data);
             }
-          }
-        }
-        if (found) {
-          let hydratedCoupon = (!hasUrlConfigOverrides && isSamePlanDraft) ? savedDraft?.appliedCoupon : null;
-          if (couponParam) {
-            try {
-              const foundCycle = String(found.billing_cycle || '').toLowerCase();
-              const isPureTr = foundCycle === 'trial' || parseFloat(found.price) <= 0;
-              const planAmt = isPureTr ? 0 : parseFloat(found.price || 0);
-              const storageObj = (fetchedCatalog.storage_plans || []).find(
-                (s) => Number(s.id) === Number(parsedStorageId)
-              );
-              const sCycle = isPureTr
-                ? (allPlans.find((p) => String(p.billing_cycle).toLowerCase() !== 'trial')?.billing_cycle || '')
-                : foundCycle;
-              const sAmt = storageObj ? Number(storageObj?.cycle_prices?.[sCycle] ?? 0) : 0;
-              const mAmt = Object.entries(parsedMachines).reduce((sum, [id, q]) => {
-                const m = (fetchedCatalog.attendance_machines || []).find((x) => Number(x.id) === Number(id));
-                return m ? sum + parseFloat(m.unit_price || 0) * q : sum;
-              }, 0);
-              const cAmt = Object.entries(parsedCards).reduce((sum, [id, q]) => {
-                const c = (fetchedCatalog.rfid_cards || []).find((x) => Number(x.id) === Number(id));
-                return c ? sum + parseFloat(c.unit_price || 0) * q : sum;
-              }, 0);
-              const nAmt = Object.entries(parsedNotifs).reduce((sum, [id, cfg]) => {
-                const n = (fetchedCatalog.notification_records || []).find((x) => Number(x.id) === Number(id));
-                return n && cfg?.selected ? sum + parseFloat(n.cost || n.unit_price || 0) * cfg.quantity : sum;
-              }, 0);
-              const couponRes = await saasApi.validateCoupon({
-                code: couponParam.trim(),
-                amount: Math.round((planAmt + sAmt + mAmt + cAmt + nAmt) * 100) / 100,
-                plan_amount: planAmt,
-                storage_amount: sAmt,
-                check_only: true,
-              });
-              if (couponRes?.data) {
-                hydratedCoupon = couponRes.data;
-                setAppliedCoupon(couponRes.data);
-              }
-            } catch (_) {}
-          }
-
-          setSelectedPlan(found);
-          setBillingCycle(found.billing_cycle || cycleParam);
-          setIsTrialMode(resolveInitialTrialFlag(found, hydratedCoupon));
-          return;
+          } catch (_) {}
         }
 
-        // Requested plan_id was not found among active plans — return user to Pricing Page
-        router.replace('/');
+        setSelectedPlan(found);
+        setBillingCycle(found.billing_cycle || cycleParam);
+        setIsTrialMode(resolveInitialTrialFlag(found, hydratedCoupon));
         return;
       }
 
-      // 2. Restore plan from saved draft
-      if (savedDraft?.selectedPlanId) {
-        const draftPlan = allPlans.find((p) => Number(p.id) === Number(savedDraft.selectedPlanId));
-        if (draftPlan) {
-          setSelectedPlan(draftPlan);
-          setBillingCycle(savedDraft.billingCycle || draftPlan.billing_cycle || '');
-          setIsTrialMode(resolveInitialTrialFlag(draftPlan, savedDraft.appliedCoupon));
-          return;
-        }
-      }
-
+      // Requested plan_id was not found among active plans — return user to Pricing Page
       router.replace('/');
     } catch (err) {
       setLoadError(
@@ -422,48 +354,6 @@ function RegisterContent() {
       setCatalogLoading(false);
     }
   };
-
-  // Continuously persist onboarding progress in sessionStorage so refreshes, "Change Plan", or payment retries never wipe data
-  useEffect(() => {
-    if (loading || !selectedPlan?.id || typeof window === 'undefined') return;
-    try {
-      const draftSnapshot = {
-        currentStep,
-        selectedPlanId: selectedPlan.id,
-        billingCycle: billingCycle || selectedPlan.billing_cycle || '',
-        isTrialMode,
-        selectedStorageId,
-        selectedMachines,
-        selectedCards,
-        selectedNotifications,
-        shippingAddress,
-        couponCode,
-        appliedCoupon,
-        schoolProfileData,
-        campusContactData,
-        academicYearData,
-        adminData,
-      };
-      sessionStorage.setItem(DRAFT_STORAGE_KEY, JSON.stringify(draftSnapshot));
-    } catch (_) {}
-  }, [
-    loading,
-    currentStep,
-    selectedPlan,
-    billingCycle,
-    isTrialMode,
-    selectedStorageId,
-    selectedMachines,
-    selectedCards,
-    selectedNotifications,
-    shippingAddress,
-    couponCode,
-    appliedCoupon,
-    schoolProfileData,
-    campusContactData,
-    academicYearData,
-    adminData,
-  ]);
 
   // Keep shipping address synced with campus address until explicitly customized
   useEffect(() => {
