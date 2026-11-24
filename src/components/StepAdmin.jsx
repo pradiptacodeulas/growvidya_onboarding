@@ -13,7 +13,6 @@ import {
   User,
   Loader2,
   CheckCircle2,
-  ShieldCheck,
   RefreshCw,
 } from 'lucide-react';
 import saasApi from '../lib/api';
@@ -41,8 +40,6 @@ export default function StepAdmin({
   const [verifyingOtp, setVerifyingOtp] = useState(false);
   const [otpSuccessMsg, setOtpSuccessMsg] = useState('');
   const [otpErrorMsg, setOtpErrorMsg] = useState('');
-  const [resendCooldown, setResendCooldown] = useState(0);
-  const [otpExpirySeconds, setOtpExpirySeconds] = useState(0);
 
   const cleanCurrentEmail = (formData.email || '').trim().toLowerCase();
   const isValidEmailFormat = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(cleanCurrentEmail);
@@ -54,12 +51,23 @@ export default function StepAdmin({
   );
   const isOtpModalOpen = Boolean(showOtpModal && otpSent && !isCurrentEmailVerified);
   const otpModalRef = useRef(null);
+  const emailInputRef = useRef(null);
 
   useEffect(() => {
     fetchGenders();
   }, []);
 
-  // Lock page scroll, block Escape dismissal, and trap focus inside the OTP verification modal
+  const handleCloseOtpModal = () => {
+    setShowOtpModal(false);
+    setOtpCode('');
+    setOtpErrorMsg('');
+    setOtpSuccessMsg('');
+    setTimeout(() => {
+      emailInputRef.current?.focus();
+    }, 0);
+  };
+
+  // Lock page scroll and trap focus inside the OTP verification modal
   useEffect(() => {
     if (!isOtpModalOpen) return;
 
@@ -99,22 +107,6 @@ export default function StepAdmin({
     };
   }, [isOtpModalOpen]);
 
-  // Countdown timer for Resend Cooldown & OTP Expiration
-  useEffect(() => {
-    if (resendCooldown <= 0 && otpExpirySeconds <= 0) return;
-    const timer = setInterval(() => {
-      setResendCooldown((prev) => (prev > 0 ? prev - 1 : 0));
-      setOtpExpirySeconds((prev) => (prev > 0 ? prev - 1 : 0));
-    }, 1000);
-    return () => clearInterval(timer);
-  }, [resendCooldown, otpExpirySeconds]);
-
-  const formatTimer = (totalSec) => {
-    const mins = Math.floor(totalSec / 60);
-    const secs = totalSec % 60;
-    return `${String(mins).padStart(2, '0')}:${String(secs).padStart(2, '0')}`;
-  };
-
   const fetchGenders = async () => {
     try {
       setLoadingGenders(true);
@@ -149,7 +141,6 @@ export default function StepAdmin({
         setOtpCode('');
         setOtpSuccessMsg('');
         setOtpErrorMsg('');
-        setOtpExpirySeconds(0);
       }
     } else {
       setFormData((prev) => ({ ...prev, [name]: value }));
@@ -184,14 +175,11 @@ export default function StepAdmin({
         first_name: formData.first_name || '',
       });
 
-      const expMins = Number(res?.data?.expiresInMinutes) || 10;
       setOtpSent(true);
       setShowOtpModal(true);
       setOtpSentEmail(targetEmail);
       setOtpCode('');
-      setResendCooldown(60);
-      setOtpExpirySeconds(expMins * 60);
-      setOtpSuccessMsg(res?.message || `Verification OTP sent to ${targetEmail}.`);
+      setOtpSuccessMsg(res?.message || '');
     } catch (err) {
       const errMsg =
         err.response?.data?.message || err.message || 'Failed to send verification OTP. Please try again.';
@@ -222,19 +210,14 @@ export default function StepAdmin({
       setOtpErrorMsg('Please enter the 6-digit OTP sent to your email.');
       return;
     }
-    if (otpExpirySeconds <= 0 && otpSent) {
-      setOtpErrorMsg('OTP has expired. Please click Resend OTP to get a new code.');
-      return;
-    }
 
     try {
       setVerifyingOtp(true);
       setOtpErrorMsg('');
       setOtpSuccessMsg('');
 
-      const targetEmail = otpSentEmail || cleanCurrentEmail;
       const res = await saasApi.verifyRegistrationOtp({
-        email: targetEmail,
+        email: otpSentEmail,
         otp: cleanOtp,
       });
 
@@ -242,13 +225,13 @@ export default function StepAdmin({
       setFormData((prev) => ({
         ...prev,
         email_verified: true,
-        verified_email: targetEmail,
+        verified_email: otpSentEmail,
         email_verification_token: token,
       }));
       setShowOtpModal(false);
       setOtpSent(false);
       setOtpCode('');
-      setOtpSuccessMsg(res?.message || 'Email address verified successfully!');
+      setOtpSuccessMsg(res?.message || '');
       setErrors((prev) => ({ ...prev, email: null }));
     } catch (err) {
       const errMsg =
@@ -485,6 +468,7 @@ export default function StepAdmin({
               <Mail size={16} />
             </span>
             <input
+              ref={emailInputRef}
               type="email"
               className={`form-control ${
                 errors.email ? 'is-invalid' : isCurrentEmailVerified ? 'border-success' : ''
@@ -500,7 +484,7 @@ export default function StepAdmin({
                 type="button"
                 className="btn btn-outline-primary fw-semibold d-inline-flex align-items-center gap-1"
                 onClick={() => handleSendOtp(cleanCurrentEmail)}
-                disabled={sendingOtp || !isValidEmailFormat || (otpSent && otpSentEmail === cleanCurrentEmail && resendCooldown > 0)}
+                disabled={sendingOtp || !isValidEmailFormat}
               >
                 {sendingOtp ? (
                   <>
@@ -508,14 +492,10 @@ export default function StepAdmin({
                     <span>Sending...</span>
                   </>
                 ) : otpSent && otpSentEmail === cleanCurrentEmail ? (
-                  resendCooldown > 0 ? (
-                    <span>Resend ({resendCooldown}s)</span>
-                  ) : (
-                    <>
-                      <RefreshCw size={14} />
-                      <span>Resend OTP</span>
-                    </>
-                  )
+                  <>
+                    <RefreshCw size={14} />
+                    <span>Resend OTP</span>
+                  </>
                 ) : (
                   <span>Send OTP</span>
                 )}
@@ -666,7 +646,7 @@ export default function StepAdmin({
         </button>
       </div>
 
-      {/* Blocking Email OTP Verification Modal */}
+      {/* Email OTP Verification Modal */}
       {isOtpModalOpen && (
         <div
           role="dialog"
@@ -686,54 +666,43 @@ export default function StepAdmin({
         >
           <div
             ref={otpModalRef}
-            className="card border-0 shadow-lg rounded-4 p-4 p-md-5 w-100 bg-white"
-            style={{ maxWidth: '460px' }}
+            className="card border-0 shadow-lg rounded-4 p-4 w-100 bg-white"
+            style={{ maxWidth: '420px' }}
           >
-            <div className="text-center mb-3">
-              <div
-                className="d-inline-flex align-items-center justify-content-center rounded-circle bg-primary-subtle text-primary mb-3"
-                style={{ width: '56px', height: '56px' }}
+            {/* Modal Header: Back Button on Left + Title */}
+            <div className="d-flex align-items-center gap-2 pb-3 mb-3 border-bottom">
+              <button
+                type="button"
+                onClick={handleCloseOtpModal}
+                className="btn btn-light btn-sm d-inline-flex align-items-center justify-content-center rounded-circle p-2 border"
+                title="Back to change email"
+                aria-label="Back to change email"
               >
-                <ShieldCheck size={28} />
-              </div>
-              <h5 id="email-otp-modal-title" className="fw-bold text-dark mb-1">
-                Email OTP Verification
+                <ArrowLeft size={16} />
+              </button>
+              <h5 id="email-otp-modal-title" className="fw-bold text-dark mb-0">
+                OTP Verification
               </h5>
-              <p className="text-muted fs-13 mb-0">
-                Enter the 6-digit verification code sent to{' '}
-                <strong className="text-dark">{otpSentEmail || cleanCurrentEmail}</strong>
+            </div>
+
+            {/* Middle Portion */}
+            <div className="text-center mb-3">
+              <p className="text-muted fs-14 mb-1">
+                We have sent a verification code to
               </p>
-            </div>
-
-            <div className="d-flex align-items-center justify-content-center mb-3">
-              {otpExpirySeconds > 0 ? (
-                <span className="badge bg-light text-secondary border px-3 py-2 fs-12 fw-medium">
-                  OTP expires in <strong className="text-dark">{formatTimer(otpExpirySeconds)}</strong>
-                </span>
-              ) : (
-                <span className="badge bg-danger-subtle text-danger border border-danger-subtle px-3 py-2 fs-12">
-                  OTP Expired — Please resend OTP
-                </span>
-              )}
-            </div>
-
-            {otpSuccessMsg && !otpErrorMsg && (
-              <div className="alert alert-success d-flex align-items-center gap-2 py-2 px-3 fs-12 mb-3">
-                <CheckCircle2 size={15} className="flex-shrink-0" />
-                <span>{otpSuccessMsg}</span>
+              <div className="fw-bold text-dark fs-14 text-break">
+                {otpSentEmail}
               </div>
-            )}
+            </div>
 
             {otpErrorMsg && (
-              <div className="alert alert-danger py-2 px-3 fs-12 mb-3">
+              <div className="alert alert-danger py-2 px-3 fs-12 mb-3 text-center">
                 {otpErrorMsg}
               </div>
             )}
 
+            {/* OTP Input */}
             <div className="mb-3">
-              <label className="form-label fw-semibold fs-13 text-dark d-block text-center">
-                Verification Code (OTP) <span className="text-danger">*</span>
-              </label>
               <input
                 type="text"
                 inputMode="numeric"
@@ -754,8 +723,7 @@ export default function StepAdmin({
                   if (
                     e.key === 'Enter' &&
                     otpCode.length === 6 &&
-                    !verifyingOtp &&
-                    otpExpirySeconds > 0
+                    !verifyingOtp
                   ) {
                     e.preventDefault();
                     handleVerifyOtp();
@@ -768,42 +736,35 @@ export default function StepAdmin({
               type="button"
               className="btn btn-primary w-100 py-2 fw-semibold d-flex align-items-center justify-content-center gap-2 mb-3"
               onClick={handleVerifyOtp}
-              disabled={verifyingOtp || sendingOtp || otpCode.length !== 6 || otpExpirySeconds <= 0}
+              disabled={verifyingOtp || sendingOtp || otpCode.length !== 6}
             >
               {verifyingOtp ? (
                 <>
                   <Loader2 size={16} className="animate-spin" />
-                  <span>Verifying OTP...</span>
+                  <span>Verifying...</span>
                 </>
               ) : (
-                <>
-                  <ShieldCheck size={16} />
-                  <span>Verify OTP</span>
-                </>
+                <span>Verify OTP</span>
               )}
             </button>
 
-            <div className="text-center border-top pt-3">
-              <span className="text-muted fs-12 d-block mb-2">
-                Didn&apos;t receive the code?
-              </span>
+            {/* Resend Button */}
+            <div className="text-center">
               <button
                 type="button"
-                className="btn btn-outline-primary btn-sm fw-semibold d-inline-flex align-items-center gap-1 px-3"
-                onClick={() => handleSendOtp(otpSentEmail || cleanCurrentEmail)}
-                disabled={sendingOtp || verifyingOtp || resendCooldown > 0}
+                className="btn btn-link btn-sm text-decoration-none fw-semibold d-inline-flex align-items-center gap-1"
+                onClick={() => handleSendOtp(otpSentEmail)}
+                disabled={sendingOtp || verifyingOtp}
               >
                 {sendingOtp ? (
                   <>
                     <Loader2 size={14} className="animate-spin" />
-                    <span>Sending OTP...</span>
+                    <span>Sending...</span>
                   </>
-                ) : resendCooldown > 0 ? (
-                  <span>Resend OTP in {resendCooldown}s</span>
                 ) : (
                   <>
                     <RefreshCw size={14} />
-                    <span>Resend OTP</span>
+                    <span>Resend</span>
                   </>
                 )}
               </button>
