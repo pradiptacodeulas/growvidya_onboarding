@@ -378,7 +378,6 @@ export default function StepReview({
         state: campusContactData.state || null,
         city: campusContactData.city || null,
         postal_code: campusContactData.postal_code || null,
-        footer: campusContactData.footer || null,
       },
       academic_year: {
         academic_year: academicYearData.academic_year,

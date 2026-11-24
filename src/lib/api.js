@@ -46,6 +46,11 @@ apiClient.interceptors.request.use((config) => {
 });
 
 export const saasApi = {
+  getFooterSetting: async () => {
+    const res = await apiClient.get('/saas/footer');
+    return res.data;
+  },
+
   getPlans: async () => {
     const res = await apiClient.get('/saas/plans');
     return res.data;

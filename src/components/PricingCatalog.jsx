@@ -15,6 +15,7 @@ import {
   RefreshCw,
 } from 'lucide-react';
 import Header from '@/components/Header';
+import Footer from '@/components/Footer';
 import saasApi from '@/lib/api';
 
 export default function PricingCatalog() {
@@ -369,11 +370,7 @@ export default function PricingCatalog() {
         </div>
       </main>
 
-      <footer className="bg-white border-top py-3 text-center text-muted fs-13 mt-auto no-print">
-        <div className="container">
-          Copyright &copy; {new Date().getFullYear()} Growvidya School Management Platform. All rights reserved.
-        </div>
-      </footer>
+      <Footer />
     </>
   );
 }

@@ -3,6 +3,7 @@
 import React, { useState, useEffect, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import Header from '@/components/Header';
+import Footer from '@/components/Footer';
 import Stepper from '@/components/Stepper';
 import StepPlan from '@/components/StepPlan';
 import StepSchoolProfile from '@/components/StepSchoolProfile';
@@ -105,7 +106,6 @@ function RegisterContent() {
     city: '',
     city_name: '',
     postal_code: '',
-    footer: '',
   });
 
   // Section 4: Academic Year Data
@@ -167,7 +167,6 @@ function RegisterContent() {
       city: '',
       city_name: '',
       postal_code: '',
-      footer: '',
     });
     setAcademicYearData({
       academic_year: '',
@@ -644,11 +643,7 @@ export default function RegisterPage() {
           <RegisterContent />
         </Suspense>
       </main>
-      <footer className="bg-white border-top py-3 text-center text-muted fs-13 mt-auto no-print">
-        <div className="container">
-          Copyright &copy; {new Date().getFullYear()} Growvidya School Management Platform. All rights reserved.
-        </div>
-      </footer>
+      <Footer />
     </>
   );
 }
