@@ -496,7 +496,81 @@ export default function StepPlan({
   };
 
   const discountAmount = computeScopedDiscount(effectiveBasePrice);
-  const grandTotal = Math.max(0, Math.round((subtotalAmount - discountAmount) * 100) / 100);
+  const taxableAmount = Math.max(0, Math.round((subtotalAmount - discountAmount) * 100) / 100);
+
+  const gstBreakdown = useMemo(() => {
+    const gstSettings = catalog?.gst_settings;
+    const isEnabled =
+      gstSettings &&
+      Number(gstSettings.is_gst_enabled) === 1 &&
+      Number(gstSettings.gst_percentage) > 0;
+    if (!isEnabled || taxableAmount <= 0) {
+      return {
+        enabled: false,
+        taxType: 'none',
+        gstPercentage: 0,
+        cgstPercentage: 0,
+        sgstPercentage: 0,
+        igstPercentage: 0,
+        cgstAmount: 0,
+        sgstAmount: 0,
+        igstAmount: 0,
+        taxAmount: 0,
+      };
+    }
+
+    const gstPct = Number(gstSettings.gst_percentage) || 0;
+    const cgstPct = Number(gstSettings.cgst_percentage ?? (gstPct / 2).toFixed(2));
+    const sgstPct = Number(gstSettings.sgst_percentage ?? (gstPct - cgstPct).toFixed(2));
+    const igstPct = Number(gstSettings.igst_percentage ?? gstPct);
+
+    const schoolStateId = campusContactData?.state ? Number(campusContactData.state) : null;
+    const homeStateId = gstSettings.home_state_id ? Number(gstSettings.home_state_id) : null;
+    const schoolStateName = String(campusContactData?.state_name || '').trim().toLowerCase().replace(/\s+/g, '');
+    const homeStateName = String(gstSettings.home_state_name || '').trim().toLowerCase().replace(/\s+/g, '');
+
+    let isIntraState = false;
+    const hasSchoolState = Boolean(schoolStateId || schoolStateName);
+    if (schoolStateId && homeStateId) {
+      isIntraState = schoolStateId === homeStateId;
+    } else if (schoolStateName && homeStateName) {
+      isIntraState = schoolStateName === homeStateName;
+    }
+
+    if (hasSchoolState && isIntraState) {
+      const cgstAmount = Math.round(((taxableAmount * cgstPct) / 100) * 100) / 100;
+      const sgstAmount = Math.round(((taxableAmount * sgstPct) / 100) * 100) / 100;
+      const taxAmount = Math.round((cgstAmount + sgstAmount) * 100) / 100;
+      return {
+        enabled: true,
+        taxType: 'intra_state',
+        gstPercentage: gstPct,
+        cgstPercentage: cgstPct,
+        sgstPercentage: sgstPct,
+        igstPercentage: 0,
+        cgstAmount,
+        sgstAmount,
+        igstAmount: 0,
+        taxAmount,
+      };
+    }
+
+    const igstAmount = Math.round(((taxableAmount * igstPct) / 100) * 100) / 100;
+    return {
+      enabled: true,
+      taxType: hasSchoolState ? 'inter_state' : 'gst_unspecified_state',
+      gstPercentage: gstPct,
+      cgstPercentage: 0,
+      sgstPercentage: 0,
+      igstPercentage: igstPct,
+      cgstAmount: 0,
+      sgstAmount: 0,
+      igstAmount,
+      taxAmount: igstAmount,
+    };
+  }, [catalog?.gst_settings, taxableAmount, campusContactData?.state, campusContactData?.state_name]);
+
+  const grandTotal = Math.max(0, Math.round((taxableAmount + gstBreakdown.taxAmount) * 100) / 100);
 
   useEffect(() => {
     if (appliedCoupon && discountAmount <= 0) {
@@ -1590,9 +1664,43 @@ export default function StepPlan({
                 </span>
               </div>
             )}
+            {gstBreakdown.enabled && gstBreakdown.taxAmount > 0 && (
+              <>
+                {gstBreakdown.taxType === 'intra_state' ? (
+                  <>
+                    <div className="d-flex justify-content-between align-items-center fs-13 mb-2">
+                      <span className="text-muted">CGST ({gstBreakdown.cgstPercentage}%):</span>
+                      <span className="fw-semibold text-dark">
+                        +₹{gstBreakdown.cgstAmount.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                      </span>
+                    </div>
+                    <div className="d-flex justify-content-between align-items-center fs-13 mb-2">
+                      <span className="text-muted">SGST ({gstBreakdown.sgstPercentage}%):</span>
+                      <span className="fw-semibold text-dark">
+                        +₹{gstBreakdown.sgstAmount.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                      </span>
+                    </div>
+                  </>
+                ) : gstBreakdown.taxType === 'inter_state' ? (
+                  <div className="d-flex justify-content-between align-items-center fs-13 mb-2">
+                    <span className="text-muted">IGST ({gstBreakdown.igstPercentage}%):</span>
+                    <span className="fw-semibold text-dark">
+                      +₹{gstBreakdown.igstAmount.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                    </span>
+                  </div>
+                ) : (
+                  <div className="d-flex justify-content-between align-items-center fs-13 mb-2">
+                    <span className="text-muted">GST ({gstBreakdown.gstPercentage}%):</span>
+                    <span className="fw-semibold text-dark">
+                      +₹{gstBreakdown.taxAmount.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                    </span>
+                  </div>
+                )}
+              </>
+            )}
             <div className="d-flex justify-content-between align-items-center pt-2 border-top">
               <div>
-                <span className="fs-15 fw-bold text-dark">Net Payable Total:</span>
+                <span className="fs-15 fw-bold text-dark">Total Payable:</span>
                 <div className="fs-11 text-muted">
                   {appliedCoupon
                     ? 'Coupon discount applied • Proceed with discounted payment'
@@ -1600,7 +1708,9 @@ export default function StepPlan({
                       ? trialDays > 0
                         ? `Includes ${trialDays}-day free trial option`
                         : 'Free evaluation access'
-                      : 'Flat net pricing • No extra charges'}
+                      : gstBreakdown.enabled
+                        ? 'Inclusive of applicable GST'
+                        : 'Flat net pricing • No extra charges'}
                 </div>
               </div>
               <div className="fs-20 fw-bold text-primary">

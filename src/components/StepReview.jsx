@@ -215,16 +215,92 @@ export default function StepReview({
     return Math.min(eligibleSubtotal, Math.round(disc * 100) / 100);
   };
 
+  const computeGstForTaxable = (taxableVal) => {
+    const gstSettings = catalog?.gst_settings;
+    const isEnabled =
+      gstSettings &&
+      Number(gstSettings.is_gst_enabled) === 1 &&
+      Number(gstSettings.gst_percentage) > 0;
+    if (!isEnabled || taxableVal <= 0) {
+      return {
+        enabled: false,
+        taxType: 'none',
+        gstPercentage: 0,
+        cgstPercentage: 0,
+        sgstPercentage: 0,
+        igstPercentage: 0,
+        cgstAmount: 0,
+        sgstAmount: 0,
+        igstAmount: 0,
+        taxAmount: 0,
+      };
+    }
+
+    const gstPct = Number(gstSettings.gst_percentage) || 0;
+    const cgstPct = Number(gstSettings.cgst_percentage ?? (gstPct / 2).toFixed(2));
+    const sgstPct = Number(gstSettings.sgst_percentage ?? (gstPct - cgstPct).toFixed(2));
+    const igstPct = Number(gstSettings.igst_percentage ?? gstPct);
+
+    const schoolStateId = campusContactData?.state ? Number(campusContactData.state) : null;
+    const homeStateId = gstSettings.home_state_id ? Number(gstSettings.home_state_id) : null;
+    const schoolStateName = String(campusContactData?.state_name || '').trim().toLowerCase().replace(/\s+/g, '');
+    const homeStateName = String(gstSettings.home_state_name || '').trim().toLowerCase().replace(/\s+/g, '');
+
+    let isIntraState = false;
+    if (schoolStateId && homeStateId) {
+      isIntraState = schoolStateId === homeStateId;
+    } else if (schoolStateName && homeStateName) {
+      isIntraState = schoolStateName === homeStateName;
+    }
+
+    if (isIntraState) {
+      const cgstAmount = Math.round(((taxableVal * cgstPct) / 100) * 100) / 100;
+      const sgstAmount = Math.round(((taxableVal * sgstPct) / 100) * 100) / 100;
+      const taxAmount = Math.round((cgstAmount + sgstAmount) * 100) / 100;
+      return {
+        enabled: true,
+        taxType: 'intra_state',
+        gstPercentage: gstPct,
+        cgstPercentage: cgstPct,
+        sgstPercentage: sgstPct,
+        igstPercentage: 0,
+        cgstAmount,
+        sgstAmount,
+        igstAmount: 0,
+        taxAmount,
+      };
+    }
+
+    const igstAmount = Math.round(((taxableVal * igstPct) / 100) * 100) / 100;
+    return {
+      enabled: true,
+      taxType: 'inter_state',
+      gstPercentage: gstPct,
+      cgstPercentage: 0,
+      sgstPercentage: 0,
+      igstPercentage: igstPct,
+      cgstAmount: 0,
+      sgstAmount: 0,
+      igstAmount,
+      taxAmount: igstAmount,
+    };
+  };
+
   const paidSubtotal = Math.round((basePrice + addonsTotal) * 100) / 100;
   const paidDiscountAmount = computeScopedDiscount(isPureFreeOrTrial ? 0 : basePrice);
-  const finalPaidAmount = Math.max(0, Math.round((paidSubtotal - paidDiscountAmount) * 100) / 100);
+  const paidTaxableAmount = Math.max(0, Math.round((paidSubtotal - paidDiscountAmount) * 100) / 100);
+  const paidGst = computeGstForTaxable(paidTaxableAmount);
+  const finalPaidAmount = Math.max(0, Math.round((paidTaxableAmount + paidGst.taxAmount) * 100) / 100);
 
   const trialDiscountAmount = computeScopedDiscount(0);
-  const trialPayable = Math.max(0, Math.round((addonsTotal - trialDiscountAmount) * 100) / 100);
+  const trialTaxableAmount = Math.max(0, Math.round((addonsTotal - trialDiscountAmount) * 100) / 100);
+  const trialGst = computeGstForTaxable(trialTaxableAmount);
+  const trialPayable = Math.max(0, Math.round((trialTaxableAmount + trialGst.taxAmount) * 100) / 100);
 
   const isEffectiveTrial = isPureFreeOrTrial || Boolean(isTrialMode);
   const displaySubtotal = isEffectiveTrial ? addonsTotal : paidSubtotal;
   const displayDiscount = isEffectiveTrial ? trialDiscountAmount : paidDiscountAmount;
+  const displayGst = isEffectiveTrial ? trialGst : paidGst;
   const displayFinalAmount = isEffectiveTrial ? trialPayable : finalPaidAmount;
 
   const handleApplyCoupon = async () => {
@@ -360,6 +436,8 @@ export default function StepReview({
         : campusContactData?.address || null,
       coupon_code:
         appliedCoupon && (!isTrialAction || trialDiscountAmount > 0) ? appliedCoupon.code : null,
+      state_id: campusContactData?.state || null,
+      state_name: campusContactData?.state_name || null,
       school: {
         school_name: schoolProfileData.school_name,
         school_code: schoolProfileData.school_code || null,
@@ -375,6 +453,7 @@ export default function StepReview({
         address: campusContactData.address || null,
         country: campusContactData.country || null,
         state: campusContactData.state || null,
+        state_name: campusContactData.state_name || null,
         city: campusContactData.city || null,
         postal_code: campusContactData.postal_code || null,
       },
@@ -1048,11 +1127,48 @@ export default function StepReview({
                   </div>
                 )}
 
+                {displayGst.enabled && displayGst.taxAmount > 0 && (
+                  <>
+                    {displayGst.taxType === 'intra_state' ? (
+                      <>
+                        <div className="d-flex justify-content-between text-dark">
+                          <span>
+                            CGST ({displayGst.cgstPercentage}%)
+                            {campusContactData?.state_name ? ` — ${campusContactData.state_name}` : ''}:
+                          </span>
+                          <span className="fw-semibold">
+                            +₹{Number(displayGst.cgstAmount).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                          </span>
+                        </div>
+                        <div className="d-flex justify-content-between text-dark">
+                          <span>
+                            SGST ({displayGst.sgstPercentage}%)
+                            {campusContactData?.state_name ? ` — ${campusContactData.state_name}` : ''}:
+                          </span>
+                          <span className="fw-semibold">
+                            +₹{Number(displayGst.sgstAmount).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                          </span>
+                        </div>
+                      </>
+                    ) : (
+                      <div className="d-flex justify-content-between text-dark">
+                        <span>
+                          IGST ({displayGst.igstPercentage}%)
+                          {campusContactData?.state_name ? ` — ${campusContactData.state_name}` : ''}:
+                        </span>
+                        <span className="fw-semibold">
+                          +₹{Number(displayGst.igstAmount).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                        </span>
+                      </div>
+                    )}
+                  </>
+                )}
+
                 <div className="d-flex justify-content-between align-items-baseline pt-3 border-top mt-1">
                   <div>
-                    <span className="fw-bold text-dark fs-16 d-block">Net Total Payable:</span>
+                    <span className="fw-bold text-dark fs-16 d-block">Total Payable:</span>
                     <span className="text-muted fs-11">
-                      Instant portal provisioning &amp; official receipt upon confirmation
+                      Instant portal provisioning &amp; official tax invoice upon confirmation
                     </span>
                   </div>
                   <span className="display-6 fw-bold text-success">

@@ -196,11 +196,15 @@ function OnboardingPaymentSuccessContent() {
                 {order && (
                   <button
                     type="button"
-                    onClick={() => window.print()}
+                    onClick={() =>
+                      saasApi.openInvoicePdfInNewTab(
+                        order.order_no || sessionResult?.order_no || orderNoParam
+                      )
+                    }
                     className="btn btn-light fw-bold px-4 py-2 shadow-sm d-inline-flex align-items-center gap-2"
                   >
                     <Printer size={16} />
-                    <span>Print / Save Receipt</span>
+                    <span>Print Invoice</span>
                   </button>
                 )}
               </div>
@@ -454,8 +458,46 @@ function OnboardingPaymentSuccessContent() {
                       </strong>
                     </div>
                   )}
+                  {order.tax_type === 'intra_state' && Number(order.tax_amount) > 0 ? (
+                    <>
+                      <div className="d-flex justify-content-between fs-13 mb-2">
+                        <span className="text-muted">
+                          CGST ({Number(order.cgst_percentage || 0)}%):
+                        </span>
+                        <strong className="text-dark">
+                          +₹{Number(order.cgst_amount || 0).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                        </strong>
+                      </div>
+                      <div className="d-flex justify-content-between fs-13 mb-2">
+                        <span className="text-muted">
+                          SGST ({Number(order.sgst_percentage || 0)}%):
+                        </span>
+                        <strong className="text-dark">
+                          +₹{Number(order.sgst_amount || 0).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                        </strong>
+                      </div>
+                    </>
+                  ) : order.tax_type === 'inter_state' && Number(order.tax_amount) > 0 ? (
+                    <div className="d-flex justify-content-between fs-13 mb-2">
+                      <span className="text-muted">
+                        IGST ({Number(order.igst_percentage || order.tax_percentage || 0)}%):
+                      </span>
+                      <strong className="text-dark">
+                        +₹{Number(order.igst_amount || order.tax_amount || 0).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                      </strong>
+                    </div>
+                  ) : Number(order.tax_amount) > 0 ? (
+                    <div className="d-flex justify-content-between fs-13 mb-2">
+                      <span className="text-muted">
+                        GST ({Number(order.tax_percentage || 0)}%):
+                      </span>
+                      <strong className="text-dark">
+                        +₹{Number(order.tax_amount || 0).toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                      </strong>
+                    </div>
+                  ) : null}
                   <div className="d-flex justify-content-between align-items-center pt-2 border-top">
-                    <span className="fw-bold text-dark fs-15">Net Total Paid:</span>
+                    <span className="fw-bold text-dark fs-15">Total Paid:</span>
                     <span className="fw-bold text-success fs-5">
                       ₹{grandTotal.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
                     </span>

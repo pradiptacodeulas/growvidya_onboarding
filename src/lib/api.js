@@ -51,6 +51,21 @@ export const saasApi = {
     return res.data;
   },
 
+  getGstSetting: async () => {
+    const res = await apiClient.get('/saas/gst');
+    return res.data;
+  },
+
+  getInvoicePdfUrl: (orderNo) => {
+    return `${getApiBaseUrl()}/saas/orders/${encodeURIComponent(orderNo)}/invoice-pdf`;
+  },
+
+  openInvoicePdfInNewTab: (orderNo) => {
+    if (typeof window === 'undefined' || !orderNo) return;
+    const url = `${getApiBaseUrl()}/saas/orders/${encodeURIComponent(orderNo)}/invoice-pdf`;
+    window.open(url, '_blank', 'noopener,noreferrer');
+  },
+
   getPlans: async () => {
     const res = await apiClient.get('/saas/plans');
     return res.data;
